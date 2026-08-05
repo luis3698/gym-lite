@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Inscripción de gym — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Inscripción de gym</h1>
+    <p class="muted">Estado de la mensualidad de cada cliente.</p>
+  </div>
+
+  <form class="card" method="get">
+    <div class="row">
+      <label class="field" style="flex:1;min-width:200px">
+        <span>Filtrar por nombre o número de documento</span>
+        <input type="search" name="q" value="{{ search }}" placeholder="Nombre, apellido o documento…">
+      </label>
+      <label class="field">
+        <span>Estado de la inscripción</span>
+        <select name="status" style="min-width:210px">
+          {% for key, label in status_filters.items() %}
+            <option value="{{ key }}" {{ 'selected' if status_filter == key }}>
+              {{ label }} ({{ counts[key] }})
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="btn btn-primary">Aplicar</button>
+      <a class="btn btn-secondary" href="{{ url_for('memberships.index') }}">Limpiar</a>
+    </div>
+
+    {# Accesos rápidos a los estados, sin tener que abrir el desplegable. #}
+    <div class="row tight" style="margin-top:.75rem">
+      {% for key, label in status_filters.items() %}
+        <a class="btn btn-sm {{ 'btn-primary' if status_filter == key else 'btn-secondary' }}"
+           href="{{ url_for('memberships.index', status=key, q=search or none) }}">
+          {{ label }} · {{ counts[key] }}
+        </a>
+      {% endfor %}
+    </div>
+  </form>
+
+  <div class="legend">
+    <span><i class="dot none"></i> Sin inscripción</span>
+    <span><i class="dot active"></i> Vigente</span>
+    <span><i class="dot expired"></i> Vencida</span>
+    <span class="spacer"></span>
+    <span>Mostrando {{ board | length }} cliente(s)</span>
+  </div>
+
+  {% if board %}
+    <div class="grid auto">
+      {% for item in board %}
+        {% set c = item.client %}
+        <a class="status-tile {{ item.status }}" href="{{ url_for('memberships.manage', client_id=c['id']) }}">
+          {{ avatar(c['photo'], c['first_name']) }}
+          <div>
+            <p class="name" style="margin:0">{{ c['first_name'] }} {{ c['last_name'] }}</p>
+            <p class="tiny" style="margin:0;opacity:.8">{{ c['document_id'] }}</p>
+          </div>
+          <p class="tiny bold" style="margin:0">
+            {% if item.status == 'active' %}
+              Vigente — {{ item.days_left }} día(s) restante(s)
+            {% elif item.status == 'expired' %}
+              Venció el {{ item.client['membership_end'] | fecha }}
+              {% if item.days_left is not none %}<br>(hace {{ -item.days_left }} día(s)){% endif %}
+            {% else %}
+              Sin inscripción
+            {% endif %}
+          </p>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card">
+      <p class="empty">
+        {% if status_filter == 'active' %}Ningún cliente tiene una inscripción vigente.
+        {% elif status_filter == 'expired' %}Ningún cliente tiene la inscripción vencida.
+        {% elif status_filter == 'none' %}Todos los clientes tienen alguna inscripción registrada.
+        {% else %}No se encontraron clientes registrados.{% endif %}
+      </p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Registro de usuarios — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div>
+      <h1>Registro de usuarios</h1>
+      <p class="muted">Fichas de los clientes del gimnasio.</p>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('clients.create') }}">+ Nuevo registro</a>
+  </div>
+
+  <form class="card" method="get">
+    <div class="row">
+      <label class="field" style="flex:1;min-width:220px">
+        <span>Buscar por nombre o número de identidad</span>
+        <input type="search" name="q" value="{{ filters.q }}" placeholder="Nombre, apellido o documento…">
+      </label>
+      <label class="field">
+        <span>Sexo</span>
+        <select name="sex" class="w-md">
+          <option value="">Todos</option>
+          {% for s in SEX_OPTIONS %}
+            <option value="{{ s }}" {{ 'selected' if filters.sex == s }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field">
+        <span>Edad mínima</span>
+        <input type="number" name="min_age" min="0" max="{{ max_age }}" value="{{ filters.min_age }}" class="w-sm">
+      </label>
+      <label class="field">
+        <span>Edad máxima</span>
+        <input type="number" name="max_age" min="0" max="{{ max_age }}" value="{{ filters.max_age }}" class="w-sm">
+      </label>
+      <button class="btn btn-primary">Buscar</button>
+      <a class="btn btn-secondary" href="{{ url_for('clients.index') }}">Limpiar</a>
+    </div>
+  </form>
+
+  {% if clients %}
+    <div class="grid auto">
+      {% for c in clients %}
+        <div class="tile">
+          {{ avatar(c['photo'], c['first_name']) }}
+          <div>
+            <p class="name" style="margin:0">{{ c['first_name'] }} {{ c['last_name'] }}</p>
+            <p class="tiny muted" style="margin:0">{{ c['document_id'] }}</p>
+          </div>
+          <a class="btn btn-secondary btn-sm btn-block" href="{{ url_for('clients.detail', client_id=c['id']) }}">
+            Ver datos completos
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card"><p class="empty">No se encontraron registros.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

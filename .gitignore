@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Base de datos, fotos subidas y clave de sesión: se generan al ejecutar la app.
+instance/
+
+# Paquetes generados por crear-paquete.bat
+GymManagerLite-*.zip
+
+.env
+*.db
+*.db-journal
+*.sqlite3
+.DS_Store

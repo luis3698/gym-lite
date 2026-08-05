@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Iniciar sesión — GymManager Lite{% endblock %}
+
+{% block anon %}
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="logo">
+      <div class="mark">🏋️</div>
+      <h1 style="font-size:1.15rem">GymManager Lite</h1>
+      <p class="muted" style="margin:.25rem 0 0">Inicia sesión para continuar</p>
+    </div>
+
+    {% include "_flashes.html" %}
+
+    <form method="post" class="stack" style="gap:.9rem">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="field">
+        <span>Usuario</span>
+        <input type="text" name="username" value="{{ username }}" autocomplete="username" autofocus required>
+      </label>
+      <label class="field">
+        <span>Contraseña</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn btn-primary btn-block">Iniciar sesión</button>
+    </form>
+
+    <p class="tiny muted center" style="margin-top:1.25rem">
+      ¿Olvidaste tu contraseña? Contacta a un administrador.
+    </p>
+  </div>
+</div>
+{% endblock %}

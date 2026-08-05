@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, confirm_form %}
+{% block title %}Inscripción — {{ client['first_name'] }} {{ client['last_name'] }}{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div class="row" style="align-items:center">
+      {{ avatar(client['photo'], client['first_name'], 'lg') }}
+      <div>
+        <h1 style="margin:0">{{ client['first_name'] }} {{ client['last_name'] }}</h1>
+        <p class="muted" style="margin:0">{{ client['document_id'] }}</p>
+      </div>
+    </div>
+    <div class="row tight">
+      <a class="btn btn-secondary" href="{{ url_for('memberships.index') }}">← Volver al tablero</a>
+      <a class="btn btn-secondary" href="{{ url_for('clients.detail', client_id=client['id']) }}">Ver ficha</a>
+    </div>
+  </div>
+
+  {% if current %}
+    {# Las vencidas también se pueden cancelar: mientras el registro exista, la clave
+       foránea impide eliminar al cliente desde "Registro de usuarios". #}
+    <div class="card" style="border-color: {{ 'var(--red-200)' if status == 'expired' else 'var(--blue-100)' }};
+                             background: {{ 'var(--red-50)' if status == 'expired' else 'var(--blue-50)' }}">
+      <div class="row between">
+        <div>
+          <h2 style="margin:0;color:{{ 'var(--red-700)' if status == 'expired' else 'var(--blue-800)' }}">
+            {{ 'Inscripción vencida' if status == 'expired' else 'Inscripción vigente' }}
+          </h2>
+          <p class="small" style="margin:.35rem 0 0;color:{{ 'var(--red-700)' if status == 'expired' else 'var(--blue-700)' }}">
+            {{ DURATIONS[current['duration_type']] }}{% if current['duration_type'] == 'MONTH' and current['months'] and current['months'] > 1 %} x {{ current['months'] }}{% endif %}
+            — {{ 'venció' if status == 'expired' else 'vence' }} {{ current['end_date'] | fecha }}
+            {% if status == 'active' %}({{ days_left }} día(s) restante(s)){% endif %}
+          </p>
+          <p class="tiny" style="margin:.5rem 0 0;color:var(--slate-600)">
+            Para eliminar el registro de este cliente primero debe cancelar esta inscripción:
+            mientras exista, el sistema no permite borrarlo.
+          </p>
+        </div>
+        <div class="row tight">
+          <a class="btn btn-secondary btn-sm" href="{{ url_for('memberships.receipt', membership_id=current['id']) }}">Ver recibo</a>
+          {{ confirm_form(
+              url_for('memberships.cancel', membership_id=current['id']),
+              '¿Seguro que desea cancelar esta inscripción? Esta acción no se puede deshacer.',
+              'Sí, cancelar inscripción',
+              '❌ Cancelar inscripción'
+          ) }}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <form method="post" class="grid cols-2" style="align-items:start">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="card stack">
+      <h2>{{ 'Renovar inscripción' if current else 'Nueva inscripción' }}</h2>
+
+      <div>
+        <p class="small bold" style="margin:0 0 .5rem">Tipo de inscripción</p>
+        <div class="grid cols-2" style="gap:.5rem">
+          {% for key, label in DURATIONS.items() %}
+            <label class="checkline" style="border:1px solid var(--slate-300);border-radius:8px;padding:.5rem .65rem">
+              <input type="radio" name="duration_type" value="{{ key }}"
+                     {{ 'checked' if (form.get('duration_type') or 'DAY_1') == key }} required>
+              <span>{{ label }}</span>
+              <span class="spacer"></span>
+              <span class="tiny muted">{{ tariffs.inscription.get(key, 0) | money }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Número de meses <span class="muted">(solo si elige «Por mes»)</span></span>
+        <input type="number" name="months" min="1" max="{{ max_months }}"
+               value="{{ form.get('months') or 1 }}" class="w-sm">
+      </label>
+
+      <label class="field">
+        <span>Fecha de inicio *</span>
+        <input type="date" name="start_date" value="{{ form.get('start_date') or default_start }}" required class="w-md">
+      </label>
+
+      <label class="field">
+        <span>Método de pago</span>
+        <select name="payment_method" class="w-md">
+          {% for key, label in PAYMENT_METHODS.items() %}
+            <option value="{{ key }}" {{ 'selected' if form.get('payment_method') == key }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <div>
+        <p class="small bold" style="margin:0 0 .5rem">Servicios complementarios</p>
+        {% if tariffs.services %}
+          <div class="stack" style="gap:.4rem">
+            {% for s in tariffs.services %}
+              <label class="checkline" style="border:1px solid var(--slate-200);border-radius:8px;padding:.45rem .65rem">
+                <input type="checkbox" name="service_ids" value="{{ s['id'] }}">
+                <span>{{ s['name'] }}</span>
+                <span class="spacer"></span>
+                <span class="muted">{{ s['price'] | money }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted small">No hay servicios complementarios configurados.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card stack">
+      <h2>Tarifas vigentes</h2>
+      <table>
+        <tbody>
+          {% for key, label in DURATIONS.items() %}
+            <tr><td>{{ label }}</td><td class="right bold">{{ tariffs.inscription.get(key, 0) | money }}</td></tr>
+          {% endfor %}
+          <tr><td class="muted">Cada mes adicional</td><td class="right">{{ tariffs.extra_month | money }}</td></tr>
+        </tbody>
+      </table>
+      <p class="tiny muted" style="margin:0">
+        El total exacto se calcula al registrar la inscripción, con las tarifas guardadas en
+        ese momento, y queda impreso en el recibo.
+      </p>
+      <button class="btn btn-primary btn-block">Registrar y generar recibo</button>
+    </div>
+  </form>
+
+  <div class="card flush">
+    <div style="padding:1.15rem 1.15rem .5rem"><h2 style="margin:0">Historial de inscripciones</h2></div>
+    {% if history %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Registrada</th><th>Tipo</th><th>Vigencia</th><th>Pago</th>
+            <th>Atendido por</th><th class="right">Total</th><th></th>
+          </tr></thead>
+          <tbody>
+            {% for m in history %}
+              <tr>
+                <td class="nowrap muted">{{ m['created_at'] | fechahora }}</td>
+                <td>{{ DURATIONS[m['duration_type']] }}{% if m['duration_type'] == 'MONTH' and m['months'] and m['months'] > 1 %} x {{ m['months'] }}{% endif %}</td>
+                <td class="nowrap">{{ m['start_date'] | fecha }} — {{ m['end_date'] | fecha }}</td>
+                <td>{{ PAYMENT_METHODS.get(m['payment_method'], m['payment_method']) }}</td>
+                <td>{{ m['seller_first'] }} {{ m['seller_last'] }}</td>
+                <td class="right bold">{{ m['total'] | money }}</td>
+                <td class="right nowrap">
+                  <a class="small" href="{{ url_for('memberships.receipt', membership_id=m['id']) }}">Recibo</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty">Este cliente todavía no tiene inscripciones.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

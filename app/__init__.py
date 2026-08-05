@@ -1,0 +1,116 @@
+"""Fábrica de la aplicación GymManager Lite."""
+
+from __future__ import annotations
+
+from datetime import timedelta
+
+from flask import Flask, g, render_template, send_from_directory
+
+from . import config as cfg
+from . import db as database
+from .helpers import register_filters
+from .security import get_csrf_token, load_logged_in_user, verify_csrf
+
+
+def create_app(*, database_path: str | None = None) -> Flask:
+    app = Flask(__name__, instance_relative_config=False)
+
+    app.config.update(
+        SECRET_KEY=cfg.get_secret_key(),
+        DATABASE=str(database_path or cfg.DATABASE_PATH),
+        MAX_CONTENT_LENGTH=cfg.MAX_UPLOAD_BYTES + (1024 * 1024),
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=cfg.SESSION_HOURS),
+        # Sin esto, editar una plantilla obliga a reiniciar el servidor.
+        TEMPLATES_AUTO_RELOAD=True,
+    )
+
+    cfg.INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
+    cfg.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    database.register(app)
+    register_filters(app)
+
+    # Global de Jinja, no valor del context processor: las macros ({% macro %}) no ven
+    # el contexto de la plantilla que las llama, y sin esto `csrf_token()` queda
+    # indefinido dentro de los formularios de confirmación de _macros.html.
+    app.jinja_env.globals["csrf_token"] = get_csrf_token
+
+    # Crea el esquema y, si la base está recién hecha, carga los datos iniciales.
+    with app.app_context():
+        is_new = database.init_db(app)
+        if is_new:
+            from .seed import seed_database
+
+            for line in seed_database(app):
+                print(f"[GymManager Lite] {line}")
+
+    app.before_request(load_logged_in_user)
+    app.before_request(verify_csrf)
+
+    from .views import audit, auth, clients, dashboard, memberships, products, sales, tariffs, users
+
+    app.register_blueprint(auth.bp)
+    app.register_blueprint(dashboard.bp)
+    app.register_blueprint(clients.bp)
+    app.register_blueprint(memberships.bp)
+    app.register_blueprint(sales.bp)
+    app.register_blueprint(products.bp)
+    app.register_blueprint(tariffs.bp)
+    app.register_blueprint(users.bp)
+    app.register_blueprint(audit.bp)
+
+    @app.route("/uploads/<path:filename>")
+    def uploaded_file(filename: str):
+        """Sirve las fotos subidas.
+
+        send_from_directory rechaza por sí mismo las rutas que intentan salir del
+        directorio (../), así que no hace falta sanear el nombre aquí.
+        """
+        return send_from_directory(cfg.UPLOAD_DIR, filename)
+
+    @app.context_processor
+    def inject_globals() -> dict:
+        """Valores disponibles en todas las plantillas sin pasarlos en cada render."""
+        return {
+            "current_user": g.get("user"),
+            "ROLES": cfg.ROLES,
+            "DURATIONS": cfg.DURATIONS,
+            "PAYMENT_METHODS": cfg.PAYMENT_METHODS,
+            "SEX_OPTIONS": cfg.SEX_OPTIONS,
+            "BLOOD_TYPES": cfg.BLOOD_TYPES,
+            "ACTION_LABELS": cfg.ACTION_LABELS,
+            "PASSWORD_POLICY_TEXT": cfg.PASSWORD_POLICY_TEXT,
+        }
+
+    @app.errorhandler(400)
+    def bad_request(err):
+        return render_template("error.html", code=400, title="Solicitud inválida",
+                               message=getattr(err, "description", "")), 400
+
+    @app.errorhandler(403)
+    def forbidden(err):
+        return render_template("error.html", code=403, title="Sin permisos",
+                               message="No tiene permisos para ver esta página."), 403
+
+    @app.errorhandler(404)
+    def not_found(err):
+        return render_template("error.html", code=404, title="Página no encontrada",
+                               message="La dirección solicitada no existe."), 404
+
+    @app.errorhandler(413)
+    def too_large(err):
+        return render_template("error.html", code=413, title="Archivo demasiado grande",
+                               message=f"La imagen supera el máximo de "
+                                       f"{cfg.MAX_UPLOAD_BYTES // (1024 * 1024)} MB."), 413
+
+    @app.errorhandler(500)
+    def server_error(err):
+        # El detalle va a la consola; al navegador solo un mensaje genérico, para no
+        # filtrar rutas ni SQL.
+        app.logger.exception("Error interno")
+        return render_template("error.html", code=500, title="Error interno",
+                               message="Ocurrió un error inesperado. Revise la consola del servidor."), 500
+
+    return app

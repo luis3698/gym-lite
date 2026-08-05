@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "_macros.html" import image_field %}
+{% block title %}{{ 'Crear usuario' if is_new else 'Editar usuario' }} — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>{{ 'Crear nuevo usuario' if is_new else 'Editar usuario' }}</h1>
+    <p class="muted">Personal del sistema. Los campos marcados con * son obligatorios.</p>
+  </div>
+
+  <form class="card stack" method="post" enctype="multipart/form-data"
+        action="{{ url_for('users.create') if is_new else url_for('users.edit', user_id=user['id']) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {{ image_field(user['photo'] if not is_new else none, 'Foto del usuario') }}
+
+    <div class="grid cols-2">
+      <label class="field"><span>Rol *</span>
+        <select name="role" required>
+          {% if is_new %}<option value="">Seleccione</option>{% endif %}
+          {% for key, label in ROLES.items() %}
+            <option value="{{ key }}" {{ 'selected' if user['role'] == key }}>{{ label }}</option>
+          {% endfor %}
+        </select></label>
+
+      {% if is_new %}
+        <label class="field"><span>Nombre de usuario *</span>
+          <input type="text" name="username" value="{{ user['username'] or '' }}" required></label>
+        <label class="field" style="grid-column:span 2"><span>Contraseña *</span>
+          <input type="password" name="password" autocomplete="new-password" required>
+          <span class="tiny muted">{{ PASSWORD_POLICY_TEXT }}</span></label>
+      {% else %}
+        <label class="field"><span>Nombre de usuario</span>
+          <input type="text" value="{{ user['username'] }}" disabled>
+          <span class="tiny muted">El nombre de usuario no se puede cambiar.</span></label>
+      {% endif %}
+
+      <label class="field"><span>Nombre *</span>
+        <input type="text" name="first_name" value="{{ user['first_name'] or '' }}" required></label>
+      <label class="field"><span>Apellido *</span>
+        <input type="text" name="last_name" value="{{ user['last_name'] or '' }}" required></label>
+      <label class="field"><span>Documento *</span>
+        <input type="text" name="document_id" value="{{ user['document_id'] or '' }}" required></label>
+      <label class="field"><span>Correo electrónico *</span>
+        <input type="email" name="email" value="{{ user['email'] or '' }}" required></label>
+      <label class="field"><span>Sexo</span>
+        <select name="sex">
+          <option value="">Seleccione</option>
+          {% for s in SEX_OPTIONS %}
+            <option value="{{ s }}" {{ 'selected' if user['sex'] == s }}>{{ s }}</option>
+          {% endfor %}
+        </select></label>
+      <label class="field"><span>Edad</span>
+        <input type="number" name="age" min="0" max="120" value="{{ user['age'] if user['age'] is not none else '' }}"></label>
+      <label class="field"><span>Número de contacto</span>
+        <input type="text" name="phone" value="{{ user['phone'] or '' }}"></label>
+      <label class="field"><span>Tipo de sangre</span>
+        <select name="blood_type">
+          <option value="">Seleccione</option>
+          {% for b in BLOOD_TYPES %}
+            <option value="{{ b }}" {{ 'selected' if user['blood_type'] == b }}>{{ b }}</option>
+          {% endfor %}
+        </select></label>
+    </div>
+
+    <div class="row">
+      <button class="btn btn-primary">{{ 'Crear usuario' if is_new else 'Guardar cambios' }}</button>
+      <a class="btn btn-secondary" href="{{ url_for('users.index') }}">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

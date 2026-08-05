@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Historial de ventas — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div>
+      <h1>Historial de ventas</h1>
+      <p class="muted">{{ sales | length }} venta(s) registrada(s) · Total {{ total | money }}</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('sales.index') }}">← Volver</a>
+  </div>
+
+  <div class="card flush">
+    {% if sales %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Fecha</th><th>Comprador</th><th>Productos</th><th>Vendedor</th>
+            <th>Pago</th><th class="right">Total</th><th></th>
+          </tr></thead>
+          <tbody>
+            {% for s in sales %}
+              <tr>
+                <td class="nowrap muted">{{ s['created_at'] | fechahora }}</td>
+                <td>
+                  <span class="bold">{{ s['buyer_name'] }}</span><br>
+                  <span class="tiny muted">{{ s['buyer_document'] }}</span>
+                </td>
+                <td class="muted small">{{ s['items_summary'] or '—' }}</td>
+                <td>{{ s['seller_first'] }} {{ s['seller_last'] }}</td>
+                <td>{{ PAYMENT_METHODS.get(s['payment_method'], s['payment_method']) }}</td>
+                <td class="right bold">{{ s['total'] | money }}</td>
+                <td class="right"><a class="small" href="{{ url_for('sales.receipt', sale_id=s['id']) }}">Recibo</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty">No hay ventas registradas todavía.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

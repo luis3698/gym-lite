@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Recibo de venta V-{{ '%06d' % sale['id'] }}{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between no-print">
+    <div>
+      <h1>Recibo de venta</h1>
+      <p class="muted">✅ Venta finalizada.</p>
+    </div>
+    <div class="row tight">
+      <a class="btn btn-secondary" href="{{ url_for('sales.index') }}">← Nueva venta</a>
+      <a class="btn btn-secondary" href="{{ url_for('sales.history') }}">Historial</a>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:620px">
+    <div class="receipt">
+      <p class="head">GymManager Lite — Recibo de venta</p>
+      <p class="tiny muted" style="margin:0">N.º de recibo: V-{{ '%06d' % sale['id'] }}</p>
+      <p class="tiny muted" style="margin:0">Fecha: {{ sale['created_at'] | fechahora }}</p>
+      <div class="sep"></div>
+
+      <p style="margin:0" class="bold">Comprador: {{ sale['buyer_name'] }} — {{ sale['buyer_document'] }}</p>
+      {% if sale['buyer_phone'] %}
+        <p style="margin:0" class="muted">Teléfono: {{ sale['buyer_phone'] }}</p>
+      {% endif %}
+      <p style="margin:0" class="muted">Vendedor: {{ sale['seller_first'] }} {{ sale['seller_last'] }}</p>
+
+      <div class="sep"></div>
+      {% for item in items %}
+        <div class="line">
+          <span>{{ item['name'] }} x{{ item['quantity'] }} ({{ item['unit_price'] | money }} c/u)</span>
+          <span>{{ (item['unit_price'] * item['quantity']) | money }}</span>
+        </div>
+      {% endfor %}
+      <div class="sep"></div>
+      <div class="line"><span>Subtotal</span><span>{{ sale['total'] | money }}</span></div>
+      <div class="line muted"><span>Impuestos</span><span>{{ 0 | money }}</span></div>
+      <div class="line bold" style="font-size:1rem"><span>Total pagado</span><span>{{ sale['total'] | money }}</span></div>
+
+      <p class="tiny muted" style="margin:.6rem 0 0">
+        Método de pago: {{ PAYMENT_METHODS.get(sale['payment_method'], sale['payment_method']) }}
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "_macros.html" import image_field %}
+{% block title %}Editar perfil — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div>
+      <h1>Editar perfil</h1>
+      <p class="muted">Sus datos personales dentro del sistema.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('users.change_password') }}">🔑 Cambiar contraseña</a>
+  </div>
+
+  <form class="card stack" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {{ image_field(user['photo'], 'Su foto') }}
+
+    <div class="grid cols-2">
+      <label class="field"><span>Nombre *</span>
+        <input type="text" name="first_name" value="{{ user['first_name'] or '' }}" required></label>
+      <label class="field"><span>Apellido *</span>
+        <input type="text" name="last_name" value="{{ user['last_name'] or '' }}" required></label>
+      <label class="field"><span>Documento *</span>
+        <input type="text" name="document_id" value="{{ user['document_id'] or '' }}" required></label>
+      <label class="field"><span>Correo electrónico *</span>
+        <input type="email" name="email" value="{{ user['email'] or '' }}" required></label>
+      <label class="field"><span>Sexo</span>
+        <select name="sex">
+          <option value="">Seleccione</option>
+          {% for s in SEX_OPTIONS %}
+            <option value="{{ s }}" {{ 'selected' if user['sex'] == s }}>{{ s }}</option>
+          {% endfor %}
+        </select></label>
+      <label class="field"><span>Edad</span>
+        <input type="number" name="age" min="0" max="120" value="{{ user['age'] if user['age'] is not none else '' }}"></label>
+      <label class="field"><span>Número de contacto</span>
+        <input type="text" name="phone" value="{{ user['phone'] or '' }}"></label>
+      <label class="field"><span>Tipo de sangre</span>
+        <select name="blood_type">
+          <option value="">Seleccione</option>
+          {% for b in BLOOD_TYPES %}
+            <option value="{{ b }}" {{ 'selected' if user['blood_type'] == b }}>{{ b }}</option>
+          {% endfor %}
+        </select></label>
+    </div>
+
+    <div class="row">
+      <button class="btn btn-primary">Guardar cambios</button>
+      <span class="muted small">Usuario: <strong>{{ user['username'] }}</strong> · Rol: {{ ROLES[user['role']] }}</span>
+    </div>
+  </form>
+</div>
+{% endblock %}

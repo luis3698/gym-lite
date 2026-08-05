@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "_macros.html" import confirm_form %}
+{% block title %}Catálogo de productos — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div>
+      <h1>Catálogo de productos</h1>
+      <p class="muted">Precios, existencias e imágenes de los productos en venta.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('sales.index') }}">← Ir a ventas</a>
+  </div>
+
+  <div class="card stack">
+    <h2>Agregar producto</h2>
+    <form method="post" action="{{ url_for('products.create') }}" enctype="multipart/form-data" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="field" style="flex:1;min-width:160px"><span>Nombre *</span>
+        <input type="text" name="name" required></label>
+      <label class="field"><span>Precio *</span>
+        <input type="number" name="price" min="1" step="any" class="w-sm" required></label>
+      <label class="field"><span>Stock</span>
+        <input type="number" name="stock" min="0" max="{{ max_stock }}" value="0" class="w-sm"></label>
+      <label class="field"><span>Categoría</span>
+        <input type="text" name="category" class="w-md"></label>
+      <label class="field"><span>Imagen</span>
+        <input type="file" name="image" accept="image/*"></label>
+      <button class="btn btn-primary">+ Agregar</button>
+    </form>
+  </div>
+
+  {% if products %}
+    <div class="stack" style="gap:.75rem">
+      {% for p in products %}
+        <div class="card tight">
+          <form method="post" action="{{ url_for('products.edit', product_id=p['id']) }}"
+                enctype="multipart/form-data" class="row" style="align-items:flex-end">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div style="width:64px">
+              {% if p['image'] %}
+                <img class="thumb sm" style="height:56px" src="{{ url_for('uploaded_file', filename=p['image']) }}" alt="">
+              {% else %}
+                <div class="thumb sm" style="height:56px;display:flex;align-items:center;justify-content:center">🛍️</div>
+              {% endif %}
+            </div>
+
+            <label class="field" style="flex:1;min-width:150px"><span>Nombre</span>
+              <input type="text" name="name" value="{{ p['name'] }}" required></label>
+            <label class="field"><span>Precio</span>
+              <input type="number" name="price" min="1" step="any" value="{{ p['price'] | num }}" class="w-sm" required></label>
+            <label class="field"><span>Stock</span>
+              <input type="number" name="stock" min="0" max="{{ max_stock }}" value="{{ p['stock'] }}" class="w-sm" required></label>
+            <label class="field"><span>Categoría</span>
+              <input type="text" name="category" value="{{ p['category'] or '' }}" class="w-md"></label>
+            <label class="field"><span>Cambiar imagen</span>
+              <input type="file" name="image" accept="image/*"></label>
+
+            <button class="btn btn-secondary">Guardar</button>
+          </form>
+
+          <div class="row between" style="margin-top:.6rem">
+            {% if p['image'] %}
+              <form method="post" action="{{ url_for('products.edit', product_id=p['id']) }}" class="row tight">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="name" value="{{ p['name'] }}">
+                <input type="hidden" name="price" value="{{ p['price'] }}">
+                <input type="hidden" name="stock" value="{{ p['stock'] }}">
+                <input type="hidden" name="category" value="{{ p['category'] or '' }}">
+                <input type="hidden" name="remove_image" value="1">
+                <button class="linkbtn tiny">Quitar imagen</button>
+              </form>
+            {% else %}<span></span>{% endif %}
+
+            {{ confirm_form(
+                url_for('products.delete', product_id=p['id']),
+                '«' ~ p['name'] ~ '» dejará de estar disponible en el catálogo. Las ventas ya registradas con este producto se conservan.',
+                'Sí, eliminar del catálogo',
+                'Eliminar'
+            ) }}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card"><p class="empty">No hay productos en el catálogo.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

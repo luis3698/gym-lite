@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}GymManager Lite{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🏋️</text></svg>">
+</head>
+<body>
+{% if current_user %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">🏋️ GymManager Lite</div>
+    <nav>
+      {% set r = current_user['role'] %}
+      <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if request.endpoint == 'dashboard.index' }}">
+        <span>🏠</span> Inicio
+      </a>
+      {% if r in ('ADMIN', 'CAJA') %}
+        <a href="{{ url_for('clients.index') }}" class="{{ 'active' if request.blueprint == 'clients' }}">
+          <span>🧾</span> Registro de usuarios
+        </a>
+        <a href="{{ url_for('memberships.index') }}" class="{{ 'active' if request.blueprint == 'memberships' }}">
+          <span>📅</span> Inscripción de gym
+        </a>
+        <a href="{{ url_for('sales.index') }}" class="{{ 'active' if request.blueprint == 'sales' }}">
+          <span>🛒</span> Venta de productos
+        </a>
+      {% endif %}
+      {% if r == 'ADMIN' %}
+        <div class="nav-sep">Administración</div>
+        <a href="{{ url_for('products.index') }}" class="{{ 'active' if request.blueprint == 'products' }}">
+          <span>📦</span> Catálogo de productos
+        </a>
+        <a href="{{ url_for('tariffs.index') }}" class="{{ 'active' if request.blueprint == 'tariffs' }}">
+          <span>💲</span> Crear tarifas
+        </a>
+        <a href="{{ url_for('users.index') }}" class="{{ 'active' if request.endpoint in ('users.index', 'users.create', 'users.edit') }}">
+          <span>👥</span> Administrar usuarios
+        </a>
+        <a href="{{ url_for('audit.index') }}" class="{{ 'active' if request.blueprint == 'audit' }}">
+          <span>🕵️</span> Registro de actividad
+        </a>
+      {% endif %}
+      <div class="nav-sep">Mi cuenta</div>
+      <a href="{{ url_for('users.profile') }}" class="{{ 'active' if request.endpoint == 'users.profile' }}">
+        <span>👤</span> Editar perfil
+      </a>
+      <a href="{{ url_for('users.change_password') }}" class="{{ 'active' if request.endpoint == 'users.change_password' }}">
+        <span>🔑</span> Cambiar contraseña
+      </a>
+    </nav>
+  </aside>
+
+  <div class="content">
+    <header class="topbar no-print">
+      <div class="who">
+        <strong>{{ current_user['first_name'] }} {{ current_user['last_name'] }}</strong>
+        <span class="tiny muted">{{ ROLES[current_user['role']] }}</span>
+      </div>
+      <div class="avatar sm">
+        {% if current_user['photo'] %}
+          <img src="{{ url_for('uploaded_file', filename=current_user['photo']) }}" alt="">
+        {% else %}{{ current_user['first_name'][0] }}{% endif %}
+      </div>
+      <form method="post" action="{{ url_for('auth.logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-secondary btn-sm">Cerrar sesión</button>
+      </form>
+    </header>
+
+    <main>
+      {% include "_flashes.html" %}
+      {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+  </div>
+</div>
+{% else %}
+  {% block anon %}{% endblock %}
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,131 @@
+{# Fragmentos reutilizados por varias pantallas. #}
+
+{% macro avatar(photo, name, size='') %}
+  <div class="avatar {{ size }}">
+    {% if photo %}
+      <img src="{{ url_for('uploaded_file', filename=photo) }}" alt="">
+    {% else %}
+      {{ (name or '?')[0] | upper }}
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{# Campo de imagen: vista previa, selector y casilla para quitarla. #}
+{% macro image_field(current, label='Foto', field='photo', remove_field='remove_photo', round=true) %}
+  <div class="row" style="align-items:center">
+    <div class="{{ 'avatar lg' if round else '' }}" {% if not round %}style="width:92px"{% endif %}>
+      {% if current %}
+        <img src="{{ url_for('uploaded_file', filename=current) }}" alt=""
+             class="{{ '' if round else 'thumb sm' }}"
+             {% if round %}style="width:100%;height:100%;object-fit:cover"{% endif %}>
+      {% elif round %}?{% else %}
+        <div class="thumb sm" style="display:flex;align-items:center;justify-content:center;color:var(--slate-400)">?</div>
+      {% endif %}
+    </div>
+    <div>
+      <label class="field">
+        <span>{{ label }}</span>
+        <input type="file" name="{{ field }}" accept="image/*">
+      </label>
+      {% if current %}
+        <label class="checkline" style="margin-top:.35rem">
+          <input type="checkbox" name="{{ remove_field }}" value="1"> Quitar la imagen actual
+        </label>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{# Toma de foto con la cámara + editor para centrar el rostro.
+   La lógica está en static/photo-capture.js; el resultado viaja en el campo oculto
+   `photo_data` como data URL y lo decodifica el servidor. #}
+{% macro photo_capture(current, label='Foto', name='photo_data') %}
+  <div class="photo-capture" data-photo-capture>
+    <input type="hidden" name="{{ name }}" value="" data-pc-input>
+
+    <div class="pc-side">
+      <div class="pc-preview avatar lg" data-pc-preview>
+        {% if current %}
+          <img src="{{ url_for('uploaded_file', filename=current) }}" alt="">
+        {% else %}
+          <span class="pc-empty">Sin foto</span>
+        {% endif %}
+      </div>
+      <button type="button" class="linkbtn danger tiny" data-pc-action="clear"
+              {{ 'hidden' if not current }}>Quitar foto</button>
+    </div>
+
+    <div class="pc-main">
+      <p class="small bold" style="margin:0 0 .4rem">{{ label }}</p>
+
+      {# Paso 1: nada en marcha #}
+      <div data-pc-step="idle">
+        <div class="row tight">
+          <button type="button" class="btn btn-primary btn-sm" data-pc-action="start">
+            📷 Tomar foto
+          </button>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0">
+            Subir imagen
+            <input type="file" accept="image/*" hidden data-pc-file>
+          </label>
+        </div>
+        <p class="tiny muted" style="margin:.4rem 0 0" data-pc-hint></p>
+      </div>
+
+      {# Paso 2: cámara en vivo #}
+      <div data-pc-step="camera" hidden>
+        <div class="pc-stage">
+          <video data-pc-video muted playsinline></video>
+        </div>
+        <div class="row tight" style="margin-top:.5rem">
+          <button type="button" class="btn btn-primary btn-sm" data-pc-action="shoot">Capturar</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-pc-action="cancel">Cancelar</button>
+        </div>
+      </div>
+
+      {# Paso 3: editor de encuadre #}
+      <div data-pc-step="editor" hidden>
+        <div class="pc-stage">
+          <canvas data-pc-canvas></canvas>
+        </div>
+        <p class="tiny muted" style="margin:.4rem 0 .2rem">
+          Arrastre la imagen para centrar el rostro dentro del círculo y ajuste el acercamiento.
+        </p>
+        <label class="checkline" style="gap:.6rem">
+          <span class="tiny">Zoom</span>
+          <input type="range" data-pc-zoom min="1" max="4" step="0.01" value="1" style="flex:1">
+        </label>
+        <div class="row tight" style="margin-top:.4rem">
+          <button type="button" class="btn btn-primary btn-sm" data-pc-action="apply">Usar esta foto</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-pc-action="retake">Repetir</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-pc-action="cancel">Cancelar</button>
+        </div>
+      </div>
+
+      <p class="small" style="color:var(--red-600);margin:.5rem 0 0" data-pc-error hidden></p>
+    </div>
+  </div>
+{% endmacro %}
+
+{# Confirmación en línea con <details>: reemplaza al modal de la versión React
+   sin necesidad de JavaScript. #}
+{% macro confirm_form(action, message, button_label='Eliminar', open_label='Eliminar', ask_password=false, extra_class='btn-ghost-danger btn-sm') %}
+  <details class="confirm">
+    <summary class="btn {{ extra_class }}">{{ open_label }}</summary>
+    <div class="panel">
+      <p>{{ message }}</p>
+      <form method="post" action="{{ action }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if ask_password %}
+          <label class="field" style="margin-bottom:.6rem">
+            <span>Escriba su contraseña para confirmar</span>
+            <input type="password" name="password" autocomplete="current-password" required>
+          </label>
+        {% endif %}
+        <div class="row tight">
+          <button class="btn btn-danger btn-sm">{{ button_label }}</button>
+        </div>
+      </form>
+    </div>
+  </details>
+{% endmacro %}

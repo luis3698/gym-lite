@@ -1,0 +1,3 @@
+# GymManager Lite — única dependencia externa.
+# El resto (SQLite, hash de contraseñas, CSV, plantillas Jinja2) viene con Python.
+Flask>=3.0,<4.0

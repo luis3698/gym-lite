@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, confirm_form %}
+{% block title %}{{ client['first_name'] }} {{ client['last_name'] }} — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div class="row" style="align-items:center">
+      {{ avatar(client['photo'], client['first_name'], 'lg') }}
+      <div>
+        <h1 style="margin:0">{{ client['first_name'] }} {{ client['last_name'] }}</h1>
+        <p class="muted" style="margin:0">{{ client['document_id'] }}</p>
+      </div>
+    </div>
+    <div class="row tight">
+      <a class="btn btn-secondary" href="{{ url_for('clients.index') }}">← Volver</a>
+      <a class="btn btn-secondary" href="{{ url_for('memberships.manage', client_id=client['id']) }}">📅 Inscripción</a>
+      <a class="btn btn-primary" href="{{ url_for('clients.edit', client_id=client['id']) }}">Editar datos</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Datos del cliente</h2>
+    <div class="deflist">
+      <div><span class="k">Sexo</span><span class="v">{{ client['sex'] or '—' }}</span></div>
+      <div><span class="k">Edad</span><span class="v">{{ client['age'] if client['age'] is not none else '—' }}</span></div>
+      <div><span class="k">Contacto</span><span class="v">{{ client['phone'] or '—' }}</span></div>
+      <div><span class="k">Correo</span><span class="v">{{ client['email'] or '—' }}</span></div>
+      <div><span class="k">Contacto de emergencia</span><span class="v">{{ client['emergency_contact_name'] or '—' }}</span></div>
+      <div><span class="k">Teléfono de emergencia</span><span class="v">{{ client['emergency_contact_phone'] or '—' }}</span></div>
+      <div><span class="k">Registrado</span><span class="v">{{ client['created_at'] | fechahora }}</span></div>
+    </div>
+  </div>
+
+  <div class="card flush">
+    <div style="padding:1.15rem 1.15rem .5rem"><h2 style="margin:0">Inscripciones</h2></div>
+    {% if memberships %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Registrada</th><th>Tipo</th><th>Vigencia</th><th>Atendido por</th><th class="right">Total</th>
+          </tr></thead>
+          <tbody>
+            {% for m in memberships %}
+              <tr>
+                <td class="nowrap muted">{{ m['created_at'] | fechahora }}</td>
+                <td>{{ DURATIONS[m['duration_type']] }}{% if m['duration_type'] == 'MONTH' and m['months'] and m['months'] > 1 %} x {{ m['months'] }}{% endif %}</td>
+                <td class="nowrap">{{ m['start_date'] | fecha }} — {{ m['end_date'] | fecha }}</td>
+                <td>{{ m['seller_first'] }} {{ m['seller_last'] }}</td>
+                <td class="right bold">{{ m['total'] | money }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty">Sin inscripciones registradas.</p>
+    {% endif %}
+  </div>
+
+  <div class="card flush">
+    <div style="padding:1.15rem 1.15rem .5rem"><h2 style="margin:0">Últimas compras</h2></div>
+    {% if sales %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Método de pago</th><th class="right">Total</th><th></th></tr></thead>
+          <tbody>
+            {% for s in sales %}
+              <tr>
+                <td class="nowrap muted">{{ s['created_at'] | fechahora }}</td>
+                <td>{{ PAYMENT_METHODS.get(s['payment_method'], s['payment_method']) }}</td>
+                <td class="right bold">{{ s['total'] | money }}</td>
+                <td class="right"><a class="small" href="{{ url_for('sales.receipt', sale_id=s['id']) }}">Ver recibo</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty">Sin compras registradas.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Eliminar registro</h2>
+    <p class="muted small">
+      Solo es posible si el cliente no tiene inscripciones ni ventas asociadas. Se pedirá su
+      contraseña para confirmar.
+    </p>
+    {{ confirm_form(
+        url_for('clients.delete', client_id=client['id']),
+        'Esta acción eliminará permanentemente el registro de ' ~ client['first_name'] ~ ' ' ~ client['last_name'] ~ '. No se puede deshacer.',
+        'Sí, eliminar cliente',
+        'Eliminar cliente',
+        ask_password=true,
+        extra_class='btn-ghost-danger'
+    ) }}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "_macros.html" import confirm_form %}
+{% block title %}Crear tarifas — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Crear tarifas</h1>
+    <p class="muted">Precios de inscripción y de los servicios complementarios.</p>
+  </div>
+
+  <div class="card stack">
+    <h2>Tarifas de inscripción</h2>
+    <form method="post" action="{{ url_for('tariffs.save_inscription') }}" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="grid cols-3">
+        {% for key, label in DURATIONS.items() %}
+          <label class="field"><span>{{ label }}</span>
+            <input type="number" name="{{ key }}" min="1" step="any"
+                   value="{{ tariffs.get(key, '') | num }}" required></label>
+        {% endfor %}
+        <label class="field"><span>Valor por mes adicional</span>
+          <input type="number" name="extra_month" min="1" step="any" value="{{ extra_month | num }}" required></label>
+      </div>
+      <p class="tiny muted" style="margin:0">
+        El «valor por mes adicional» se cobra por cada mes a partir del segundo en las
+        inscripciones «Por mes».
+      </p>
+      <div><button class="btn btn-primary">Guardar tarifas</button></div>
+    </form>
+  </div>
+
+  <div class="card stack">
+    <h2>Servicios complementarios</h2>
+
+    {% if services %}
+      <div class="stack" style="gap:.5rem">
+        {% for s in services %}
+          <div class="row" style="align-items:flex-end">
+            <form method="post" action="{{ url_for('tariffs.edit_service', service_id=s['id']) }}"
+                  class="row" style="flex:1;align-items:flex-end">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label class="field" style="flex:1;min-width:160px"><span>Nombre</span>
+                <input type="text" name="name" value="{{ s['name'] }}" required></label>
+              <label class="field"><span>Valor</span>
+                <input type="number" name="price" min="1" step="any" value="{{ s['price'] | num }}" class="w-sm" required></label>
+              <button class="btn btn-secondary">Guardar</button>
+            </form>
+            {{ confirm_form(
+                url_for('tariffs.delete_service', service_id=s['id']),
+                '«' ~ s['name'] ~ '» dejará de ofrecerse en nuevas inscripciones. Las ya registradas con este servicio se conservan.',
+                'Sí, eliminar servicio',
+                'Eliminar'
+            ) }}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted small">Todavía no hay servicios complementarios.</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('tariffs.create_service') }}" class="row"
+          style="border-top:1px solid var(--slate-200);padding-top:.9rem;align-items:flex-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="field" style="flex:1;min-width:160px"><span>Nuevo servicio</span>
+        <input type="text" name="name" placeholder="Casillero, clases grupales…" required></label>
+      <label class="field"><span>Valor</span>
+        <input type="number" name="price" min="1" step="any" class="w-sm" required></label>
+      <button class="btn btn-primary">+ Agregar servicio</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

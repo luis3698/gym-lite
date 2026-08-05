@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Inicio — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Hola, {{ current_user['first_name'] }} 👋</h1>
+    <p class="muted">Resumen general del gimnasio</p>
+  </div>
+
+  <div class="grid cols-4">
+    <div class="card kpi">
+      <div class="icon">👥</div>
+      <div><p class="tiny muted" style="margin:0">Clientes activos</p>
+        <p class="value" style="margin:0">{{ kpis.active_users }}</p>
+        <p class="tiny muted" style="margin:0">de {{ kpis.total_clients }} registrados</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">✅</div>
+      <div><p class="tiny muted" style="margin:0">Inscripciones vigentes</p>
+        <p class="value" style="margin:0">{{ kpis.active_memberships }}</p>
+        <p class="tiny muted" style="margin:0">+{{ kpis.new_clients_month }} cliente(s) este mes</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">⏳</div>
+      <div><p class="tiny muted" style="margin:0">Por vencer (7 días)</p>
+        <p class="value" style="margin:0">{{ kpis.expiring_soon }}</p>
+        <p class="tiny muted" style="margin:0">{{ kpis.without_membership }} sin inscripción</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">💰</div>
+      <div><p class="tiny muted" style="margin:0">Ingresos del día</p>
+        <p class="value" style="margin:0">{{ kpis.today_income | money }}</p>
+        <p class="tiny muted" style="margin:0">mes: {{ current_month_income | money }}</p></div>
+    </div>
+  </div>
+
+  {# --- Clientes con la inscripción vencida ------------------------------- #}
+  <div class="card">
+    <div class="row between" style="margin-bottom:.9rem">
+      <div>
+        <h2 style="margin:0">🔴 Clientes con inscripción vencida</h2>
+        <p class="tiny muted" style="margin:.2rem 0 0">
+          {{ kpis.expired_count }} cliente(s) sin inscripción vigente. Requieren renovación.
+        </p>
+      </div>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('memberships.index', status='expired') }}">
+        Ver en el tablero
+      </a>
+    </div>
+
+    {% if expired_clients %}
+      <div class="grid auto">
+        {% for c in expired_clients %}
+          <a class="status-tile expired" href="{{ url_for('memberships.manage', client_id=c['id']) }}">
+            {{ avatar(c['photo'], c['first_name']) }}
+            <div>
+              <p class="name" style="margin:0">{{ c['first_name'] }} {{ c['last_name'] }}</p>
+              <p class="tiny" style="margin:0;opacity:.85">{{ c['document_id'] }}</p>
+              {% if c['phone'] %}
+                <p class="tiny" style="margin:0;opacity:.85">📞 {{ c['phone'] }}</p>
+              {% endif %}
+            </div>
+            <p class="tiny bold" style="margin:0">
+              Venció el {{ c['end_date'] | fecha }}<br>
+              hace {{ c['days_expired'] }} día(s)
+            </p>
+            <span class="tiny" style="opacity:.75">
+              Última: {{ DURATIONS[c['duration_type']] }}{% if c['duration_type'] == 'MONTH' and c['months'] and c['months'] > 1 %} x {{ c['months'] }}{% endif %}
+              · {{ c['total'] | money }}
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">👏 Ningún cliente tiene la inscripción vencida.</p>
+    {% endif %}
+  </div>
+
+  {# --- Próximas a vencer -------------------------------------------------- #}
+  {% if expiring_clients %}
+    <div class="card">
+      <div class="row between" style="margin-bottom:.9rem">
+        <div>
+          <h2 style="margin:0">⏳ Vencen en los próximos 7 días</h2>
+          <p class="tiny muted" style="margin:.2rem 0 0">Buen momento para ofrecer la renovación.</p>
+        </div>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('memberships.index', status='active') }}">
+          Ver vigentes
+        </a>
+      </div>
+      <div class="grid auto">
+        {% for c in expiring_clients %}
+          <a class="status-tile active" href="{{ url_for('memberships.manage', client_id=c['id']) }}">
+            {{ avatar(c['photo'], c['first_name']) }}
+            <div>
+              <p class="name" style="margin:0">{{ c['first_name'] }} {{ c['last_name'] }}</p>
+              <p class="tiny" style="margin:0;opacity:.85">{{ c['document_id'] }}</p>
+              {% if c['phone'] %}
+                <p class="tiny" style="margin:0;opacity:.85">📞 {{ c['phone'] }}</p>
+              {% endif %}
+            </div>
+            <p class="tiny bold" style="margin:0">
+              Vence el {{ c['end_date'] | fecha }}<br>
+              en {{ c['days_left'] }} día(s)
+            </p>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {# --- Gráficas ----------------------------------------------------------- #}
+  <div class="grid cols-2">
+    <div class="card">
+      <h2>Clientes registrados por mes</h2>
+      {{ users_chart }}
+    </div>
+    <div class="card">
+      <div class="row between" style="margin-bottom:.75rem">
+        <h2 style="margin:0">Ingresos por mes</h2>
+        <span class="small bold" style="color:var(--indigo-600)">
+          Mes actual: {{ current_month_income | money }}
+        </span>
+      </div>
+      {{ income_chart }}
+    </div>
+  </div>
+
+  {# --- Detalle del mes, productos y stock ---------------------------------- #}
+  <div class="grid cols-3">
+    <div class="card">
+      <h2>Ingresos del mes en curso</h2>
+      <table>
+        <tbody>
+          <tr><td>Inscripciones</td><td class="right bold">{{ month_membership_income | money }}</td></tr>
+          <tr><td>Venta de productos</td><td class="right bold">{{ month_sales_income | money }}</td></tr>
+          <tr><td class="bold">Total</td>
+              <td class="right bold" style="color:var(--green-600)">
+                {{ (month_membership_income + month_sales_income) | money }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Productos más vendidos</h2>
+      {% if top_products %}
+        <table>
+          <thead><tr><th>Producto</th><th class="center">Uds.</th><th class="right">Ingresos</th></tr></thead>
+          <tbody>
+            {% for p in top_products %}
+              <tr>
+                <td>{{ p['name'] }}</td>
+                <td class="center">{{ p['unidades'] }}</td>
+                <td class="right bold">{{ p['ingresos'] | money }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="empty">Todavía no hay ventas registradas.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="row between" style="margin-bottom:.5rem">
+        <h2 style="margin:0">Stock bajo</h2>
+        {% if current_user['role'] == 'ADMIN' %}
+          <a class="tiny" href="{{ url_for('products.index') }}">Catálogo</a>
+        {% endif %}
+      </div>
+      {% if low_stock %}
+        <table>
+          <tbody>
+            {% for p in low_stock %}
+              <tr>
+                <td>{{ p['name'] }}</td>
+                <td class="right">
+                  <span class="badge {{ 'expired' if p['stock'] == 0 else 'draft' }}">
+                    {{ 'Agotado' if p['stock'] == 0 else p['stock'] ~ ' uds.' }}
+                  </span>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="empty">Todos los productos tienen stock suficiente.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Liquidar compra — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <h1>Liquidar compra</h1>
+    <a class="btn btn-secondary" href="{{ url_for('sales.index') }}">← Volver al carrito</a>
+  </div>
+
+  <div class="grid cols-2" style="align-items:start">
+    <div class="card stack">
+      <h2>Datos del comprador</h2>
+
+      {# Buscar por documento es un GET aparte: rellena el formulario con los datos del
+         cliente si ya está registrado. #}
+      <form method="get" class="row">
+        <label class="field" style="flex:1">
+          <span>Número de identidad *</span>
+          <input type="text" name="buyer_document" value="{{ buyer.get('buyer_document', '') }}">
+        </label>
+        <button class="btn btn-secondary">Buscar cliente</button>
+      </form>
+
+      <form method="post" class="stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="buyer_document" value="{{ buyer.get('buyer_document', '') }}">
+
+        <label class="field">
+          <span>Nombre del comprador *</span>
+          <input type="text" name="buyer_name" value="{{ buyer.get('buyer_name', '') }}" required>
+        </label>
+        <label class="field">
+          <span>Teléfono</span>
+          <input type="text" name="buyer_phone" value="{{ buyer.get('buyer_phone', '') }}">
+        </label>
+        <label class="field">
+          <span>Método de pago</span>
+          <select name="payment_method" class="w-md">
+            {% for key, label in PAYMENT_METHODS.items() %}
+              <option value="{{ key }}" {{ 'selected' if buyer.get('payment_method') == key }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <p class="tiny muted" style="margin:0">
+          Si el documento corresponde a un cliente registrado, la venta queda asociada a su ficha.
+        </p>
+        <button class="btn btn-primary btn-block">Confirmar compra</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Resumen</h2>
+      <table>
+        <thead><tr><th>Producto</th><th class="center">Cant.</th><th class="right">Subtotal</th></tr></thead>
+        <tbody>
+          {% for line in lines %}
+            <tr>
+              <td>{{ line.name }}<br><span class="tiny muted">{{ line.price | money }} c/u</span></td>
+              <td class="center">{{ line.quantity }}</td>
+              <td class="right bold">{{ line.subtotal | money }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="row between" style="margin-top:.9rem;padding-top:.75rem;border-top:1px solid var(--slate-200);font-size:1.05rem;font-weight:700">
+        <span>Total a pagar</span><span>{{ total | money }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

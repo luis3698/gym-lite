@@ -1,0 +1,154 @@
+-- Esquema de GymManager Lite (SQLite).
+--
+-- Diferencias respecto a la versión original, por diseño:
+--   * No hay columnas de biometría facial (face_descriptor) ni tabla de asistencias:
+--     esta versión no incluye reconocimiento facial.
+--   * Los clientes son fichas de registro: no tienen contraseña ni acceso propio,
+--     así que tampoco failed_attempts ni locked_until.
+--
+-- Las fechas se guardan como texto:
+--   * fechas puras       -> 'YYYY-MM-DD'          (vigencias, publicaciones)
+--   * fechas con hora    -> 'YYYY-MM-DD HH:MM:SS' (creación, auditoría)
+-- Es el formato que SQLite ordena y compara correctamente como texto.
+
+PRAGMA foreign_keys = ON;
+
+-- Personal del sistema. Es el único tipo de cuenta que puede iniciar sesión.
+CREATE TABLE IF NOT EXISTS users (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    username        TEXT    NOT NULL UNIQUE,
+    password_hash   TEXT    NOT NULL,
+    role            TEXT    NOT NULL CHECK (role IN ('ADMIN', 'CAJA', 'ENTRENADOR')),
+    first_name      TEXT    NOT NULL,
+    last_name       TEXT    NOT NULL,
+    document_id     TEXT    NOT NULL UNIQUE,
+    sex             TEXT,
+    age             INTEGER CHECK (age IS NULL OR (age >= 0 AND age <= 120)),
+    phone           TEXT,
+    email           TEXT    NOT NULL UNIQUE,
+    blood_type      TEXT,
+    photo           TEXT,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until    TEXT,
+    created_at      TEXT    NOT NULL,
+    updated_at      TEXT    NOT NULL
+);
+
+-- Clientes del gimnasio: ficha administrativa, sin credenciales.
+-- email admite NULL y es UNIQUE: SQLite permite varios NULL en una columna UNIQUE,
+-- así que varios clientes pueden quedarse sin correo sin chocar entre sí.
+CREATE TABLE IF NOT EXISTS clients (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name              TEXT    NOT NULL,
+    last_name               TEXT    NOT NULL,
+    document_id             TEXT    NOT NULL UNIQUE,
+    sex                     TEXT,
+    age                     INTEGER CHECK (age IS NULL OR (age >= 0 AND age <= 120)),
+    phone                   TEXT,
+    email                   TEXT    UNIQUE,
+    emergency_contact_name  TEXT,
+    emergency_contact_phone TEXT,
+    photo                   TEXT,
+    created_at              TEXT    NOT NULL,
+    updated_at              TEXT    NOT NULL
+);
+
+-- Tarifas de inscripción por duración.
+CREATE TABLE IF NOT EXISTS inscription_tariffs (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    duration TEXT    NOT NULL UNIQUE CHECK (duration IN ('DAY_1', 'DAY_7', 'DAY_15', 'MONTH')),
+    price    REAL    NOT NULL CHECK (price > 0)
+);
+
+-- Valor de cada mes adicional cuando la inscripción es de varios meses.
+-- El CHECK sobre id fuerza que exista como máximo una fila.
+CREATE TABLE IF NOT EXISTS extra_month_tariff (
+    id    INTEGER PRIMARY KEY CHECK (id = 1),
+    price REAL NOT NULL CHECK (price > 0)
+);
+
+-- Servicios complementarios (casillero, clases grupales, etc.).
+CREATE TABLE IF NOT EXISTS services (
+    id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    name   TEXT    NOT NULL UNIQUE,
+    price  REAL    NOT NULL CHECK (price > 0),
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
+);
+
+-- Inscripción de gimnasio (mensualidad).
+CREATE TABLE IF NOT EXISTS memberships (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id      INTEGER NOT NULL REFERENCES clients(id),
+    sold_by_id     INTEGER NOT NULL REFERENCES users(id),
+    duration_type  TEXT    NOT NULL CHECK (duration_type IN ('DAY_1', 'DAY_7', 'DAY_15', 'MONTH')),
+    months         INTEGER,
+    start_date     TEXT    NOT NULL,
+    end_date       TEXT    NOT NULL,
+    base_price     REAL    NOT NULL,
+    services_total REAL    NOT NULL DEFAULT 0,
+    total          REAL    NOT NULL,
+    payment_method TEXT    NOT NULL DEFAULT 'EFECTIVO',
+    created_at     TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS membership_services (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    membership_id INTEGER NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
+    service_id    INTEGER NOT NULL REFERENCES services(id),
+    price         REAL    NOT NULL
+);
+
+-- Catálogo de productos. Eliminar un producto lo marca inactivo (active = 0) para no
+-- romper el histórico de ventas que lo referencia.
+CREATE TABLE IF NOT EXISTS products (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL,
+    price      REAL    NOT NULL CHECK (price > 0),
+    stock      INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+    category   TEXT,
+    image      TEXT,
+    active     INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    created_at TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sales (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    seller_id      INTEGER NOT NULL REFERENCES users(id),
+    client_id      INTEGER REFERENCES clients(id),
+    buyer_document TEXT    NOT NULL,
+    buyer_name     TEXT    NOT NULL,
+    buyer_phone    TEXT,
+    total          REAL    NOT NULL,
+    payment_method TEXT    NOT NULL DEFAULT 'EFECTIVO',
+    created_at     TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sale_items (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    sale_id    INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    quantity   INTEGER NOT NULL CHECK (quantity > 0),
+    unit_price REAL    NOT NULL
+);
+
+-- Registro de actividad. user_id admite NULL para los intentos de inicio de sesión
+-- contra una cuenta que no existe.
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action     TEXT    NOT NULL,
+    detail     TEXT,
+    success    INTEGER NOT NULL DEFAULT 1 CHECK (success IN (0, 1)),
+    created_at TEXT    NOT NULL
+);
+
+-- Índices para las consultas que más se repiten (tableros y listados con filtro).
+CREATE INDEX IF NOT EXISTS idx_memberships_client   ON memberships(client_id);
+CREATE INDEX IF NOT EXISTS idx_memberships_end      ON memberships(end_date);
+CREATE INDEX IF NOT EXISTS idx_memberships_created  ON memberships(created_at);
+CREATE INDEX IF NOT EXISTS idx_sale_items_sale      ON sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sales_created        ON sales(created_at);
+CREATE INDEX IF NOT EXISTS idx_clients_document     ON clients(document_id);
+CREATE INDEX IF NOT EXISTS idx_clients_created      ON clients(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_created        ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_user           ON audit_logs(user_id);

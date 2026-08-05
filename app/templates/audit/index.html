@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Registro de actividad — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Registro de actividad</h1>
+    <p class="muted">
+      Historial de acciones del personal: inicios de sesión, altas y bajas de registros,
+      cambios de tarifas, ventas e inscripciones.
+    </p>
+  </div>
+
+  <form class="card" method="get">
+    <div class="row">
+      <label class="field"><span>Rol</span>
+        <select name="role" class="w-md">
+          <option value="">Todos los roles</option>
+          {% for key, label in staff_roles.items() %}
+            <option value="{{ key }}" {{ 'selected' if filters.role == key }}>{{ label }}</option>
+          {% endfor %}
+        </select></label>
+      <label class="field"><span>Usuario</span>
+        <select name="user_id" class="w-md">
+          <option value="">Todos los usuarios</option>
+          {% for u in users %}
+            <option value="{{ u['id'] }}" {{ 'selected' if filters.user_id == u['id'] | string }}>
+              {{ u['first_name'] }} {{ u['last_name'] }} ({{ u['username'] }})
+            </option>
+          {% endfor %}
+        </select></label>
+      <label class="field"><span>Desde</span>
+        <input type="date" name="from" value="{{ filters['from'] }}"></label>
+      <label class="field"><span>Hasta</span>
+        <input type="date" name="to" value="{{ filters.to }}"></label>
+      <button class="btn btn-primary">Aplicar filtros</button>
+      <a class="btn btn-secondary" href="{{ url_for('audit.index') }}">Limpiar</a>
+      <span class="spacer"></span>
+      <a class="btn btn-secondary" href="{{ url_for('audit.export_csv', **request.args) }}">⬇️ Exportar CSV</a>
+    </div>
+  </form>
+
+  <div class="card flush">
+    {% if logs %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Fecha y hora</th><th>Usuario</th><th>Rol</th><th>Acción</th><th>Detalle</th><th>Resultado</th>
+          </tr></thead>
+          <tbody>
+            {% for l in logs %}
+              <tr>
+                <td class="nowrap muted">{{ l['created_at'] | fechahora_seg }}</td>
+                <td>
+                  {% if l['username'] %}
+                    <span class="bold">{{ l['first_name'] }} {{ l['last_name'] }}</span><br>
+                    <span class="tiny muted">{{ l['username'] }}</span>
+                  {% else %}
+                    <span class="muted">Desconocido</span>
+                  {% endif %}
+                </td>
+                <td class="muted">{{ ROLES.get(l['role'], '—') if l['role'] else '—' }}</td>
+                <td>{{ ACTION_LABELS.get(l['action'], l['action']) }}</td>
+                <td class="muted small">{{ l['detail'] or '—' }}</td>
+                <td>
+                  <span class="badge {{ 'ok' if l['success'] else 'fail' }}">
+                    {{ 'Éxito' if l['success'] else 'Fallido' }}
+                  </span>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if logs | length >= max_rows %}
+        <p class="tiny muted" style="padding:.75rem 1rem;margin:0">
+          Se muestran los {{ max_rows }} registros más recientes que cumplen el filtro.
+          Acote las fechas para ver los anteriores.
+        </p>
+      {% endif %}
+    {% else %}
+      <p class="empty">No hay registros para los filtros seleccionados.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

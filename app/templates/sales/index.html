@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Venta de productos — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div>
+      <h1>Venta de productos</h1>
+      <p class="muted">Seleccione productos para agregarlos al carrito.</p>
+    </div>
+    <div class="row tight">
+      <a class="btn btn-secondary" href="{{ url_for('sales.history') }}">Historial de ventas</a>
+      {% if current_user['role'] == 'ADMIN' %}
+        <a class="btn btn-secondary" href="{{ url_for('products.index') }}">Administrar catálogo</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: 2fr 1fr">
+    <div class="grid auto" style="align-content:start">
+      {% for p in products %}
+        <form method="post" action="{{ url_for('sales.cart_add', product_id=p['id']) }}"
+              class="tile product-tile {{ 'out' if p['stock'] <= 0 }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if p['image'] %}
+            <img class="thumb sm" src="{{ url_for('uploaded_file', filename=p['image']) }}" alt="">
+          {% else %}
+            <div style="font-size:2rem">🛍️</div>
+          {% endif %}
+          <div>
+            <p class="name" style="margin:0">{{ p['name'] }}</p>
+            <p class="tiny muted" style="margin:0">{{ p['category'] or '—' }}</p>
+            <p class="bold" style="margin:.25rem 0 0;color:var(--indigo-600)">{{ p['price'] | money }}</p>
+            <p class="tiny muted" style="margin:0">
+              {{ ('Stock: ' ~ p['stock']) if p['stock'] > 0 else 'Agotado' }}
+            </p>
+          </div>
+          <button class="btn btn-secondary btn-sm btn-block" {{ 'disabled' if p['stock'] <= 0 }}>Agregar</button>
+        </form>
+      {% else %}
+        <div class="card"><p class="empty">No hay productos en el catálogo.</p></div>
+      {% endfor %}
+    </div>
+
+    <div class="card" style="align-self:start;position:sticky;top:1rem">
+      <div class="row between" style="margin-bottom:.75rem">
+        <h2 style="margin:0">Carrito</h2>
+        {% if lines %}
+          <form method="post" action="{{ url_for('sales.cart_clear') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="linkbtn danger tiny">Vaciar</button>
+          </form>
+        {% endif %}
+      </div>
+
+      {% if lines %}
+        <div class="stack" style="gap:.6rem">
+          {% for line in lines %}
+            <div class="row between" style="gap:.4rem;align-items:center">
+              <div style="flex:1;min-width:0">
+                <p class="small bold" style="margin:0">{{ line.name }}</p>
+                <p class="tiny muted" style="margin:0">{{ line.price | money }} c/u · stock {{ line.stock }}</p>
+              </div>
+              <form method="post" action="{{ url_for('sales.cart_update', product_id=line.id) }}" class="row tight" style="align-items:center">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="number" name="quantity" value="{{ line.quantity }}" min="1" max="{{ line.stock }}"
+                       style="width:64px" onchange="this.form.submit()">
+                <button class="btn btn-secondary btn-sm">OK</button>
+              </form>
+              <form method="post" action="{{ url_for('sales.cart_remove', product_id=line.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="linkbtn danger" title="Quitar">✕</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="sep" style="border-top:1px solid var(--slate-200);margin:.9rem 0"></div>
+        <div class="row between" style="font-size:1.05rem;font-weight:700">
+          <span>Total</span><span>{{ total | money }}</span>
+        </div>
+        <a class="btn btn-primary btn-block" style="margin-top:.75rem" href="{{ url_for('sales.checkout') }}">
+          Liquidar compra
+        </a>
+      {% else %}
+        <p class="muted small">El carrito está vacío.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, confirm_form %}
+{% block title %}Administrar usuarios — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div>
+      <h1>Administrar usuarios</h1>
+      <p class="muted">Personal con acceso al sistema.</p>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('users.create') }}">+ Crear nuevo usuario</a>
+  </div>
+
+  <div class="grid auto">
+    {% for u in users %}
+      <div class="tile">
+        {{ avatar(u['photo'], u['first_name']) }}
+        <div>
+          <p class="name" style="margin:0">{{ u['first_name'] }} {{ u['last_name'] }}</p>
+          <p class="tiny muted" style="margin:0">{{ u['username'] }}</p>
+          <span class="badge role" style="margin-top:.35rem">{{ ROLES[u['role']] }}</span>
+        </div>
+        <a class="btn btn-secondary btn-sm btn-block" href="{{ url_for('users.edit', user_id=u['id']) }}">Editar</a>
+        {% if u['id'] != current_user['id'] %}
+          {{ confirm_form(
+              url_for('users.delete', user_id=u['id']),
+              'Esta acción eliminará permanentemente a ' ~ u['first_name'] ~ ' ' ~ u['last_name'] ~ '.',
+              'Sí, eliminar usuario',
+              'Eliminar',
+              ask_password=true
+          ) }}
+        {% else %}
+          <span class="tiny muted">Es su propia cuenta</span>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_macros.html" import photo_capture %}
+{% block title %}{{ 'Nuevo registro' if is_new else 'Editar cliente' }} — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>{{ 'Nuevo registro' if is_new else 'Editar cliente' }}</h1>
+    <p class="muted">Los campos marcados con * son obligatorios.</p>
+  </div>
+
+  <form class="card stack" method="post" enctype="multipart/form-data"
+        action="{{ url_for('clients.create') if is_new else url_for('clients.edit', client_id=client['id']) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {{ photo_capture(client['photo'] if not is_new else none, 'Foto del cliente') }}
+
+    <div class="grid cols-2">
+      <label class="field"><span>Nombre *</span>
+        <input type="text" name="first_name" value="{{ client['first_name'] or '' }}" required></label>
+      <label class="field"><span>Apellido *</span>
+        <input type="text" name="last_name" value="{{ client['last_name'] or '' }}" required></label>
+      <label class="field"><span>Número de identidad *</span>
+        <input type="text" name="document_id" value="{{ client['document_id'] or '' }}" required></label>
+      <label class="field"><span>Sexo</span>
+        <select name="sex">
+          <option value="">Seleccione</option>
+          {% for s in SEX_OPTIONS %}
+            <option value="{{ s }}" {{ 'selected' if client['sex'] == s }}>{{ s }}</option>
+          {% endfor %}
+        </select></label>
+      <label class="field"><span>Edad</span>
+        <input type="number" name="age" min="0" max="120" value="{{ client['age'] if client['age'] is not none else '' }}"></label>
+      <label class="field"><span>Número de contacto</span>
+        <input type="text" name="phone" value="{{ client['phone'] or '' }}"></label>
+      <label class="field"><span>Correo electrónico</span>
+        <input type="email" name="email" value="{{ client['email'] or '' }}"></label>
+      <div></div>
+      <label class="field"><span>Nombre contacto de emergencia</span>
+        <input type="text" name="emergency_contact_name" value="{{ client['emergency_contact_name'] or '' }}"></label>
+      <label class="field"><span>Teléfono contacto de emergencia</span>
+        <input type="text" name="emergency_contact_phone" value="{{ client['emergency_contact_phone'] or '' }}"></label>
+    </div>
+
+    <div class="row">
+      <button class="btn btn-primary">{{ 'Registrar cliente' if is_new else 'Guardar cambios' }}</button>
+      <a class="btn btn-secondary"
+         href="{{ url_for('clients.index') if is_new else url_for('clients.detail', client_id=client['id']) }}">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='photo-capture.js') }}" defer></script>
+{% endblock %}

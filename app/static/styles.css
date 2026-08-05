@@ -1,0 +1,438 @@
+/* GymManager Lite — hoja de estilos única.
+   Sin frameworks: mismo lenguaje visual que la versión original (grises slate,
+   acento índigo) escrito a mano. */
+
+:root {
+  --slate-50:  #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --indigo-50:  #eef2ff;
+  --indigo-100: #e0e7ff;
+  --indigo-400: #818cf8;
+  --indigo-600: #4f46e5;
+  --indigo-700: #4338ca;
+  --green-50:  #f0fdf4;
+  --green-100: #dcfce7;
+  --green-500: #22c55e;
+  --green-600: #16a34a;
+  --green-700: #15803d;
+  --red-50:  #fef2f2;
+  --red-100: #fee2e2;
+  --red-200: #fecaca;
+  --red-400: #f87171;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+  --red-700: #b91c1c;
+  --amber-50:  #fffbeb;
+  --amber-100: #fef3c7;
+  --amber-200: #fde68a;
+  --amber-600: #d97706;
+  --amber-700: #b45309;
+  --blue-50:  #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-400: #60a5fa;
+  --blue-700: #1d4ed8;
+  --blue-800: #1e40af;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgb(15 23 42 / 8%), 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  background: var(--slate-100);
+  color: var(--slate-800);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a { color: var(--indigo-600); }
+
+h1 { font-size: 1.6rem; margin: 0 0 .25rem; color: var(--slate-800); }
+h2 { font-size: 1rem; margin: 0 0 .75rem; color: var(--slate-700); }
+h3 { font-size: .9rem; margin: 0 0 .5rem; color: var(--slate-700); }
+
+.muted { color: var(--slate-500); font-size: .875rem; }
+.small { font-size: .8rem; }
+.tiny  { font-size: .72rem; }
+.right { text-align: right; }
+.center { text-align: center; }
+.bold { font-weight: 700; }
+.nowrap { white-space: nowrap; }
+
+/* --- Estructura ---------------------------------------------------------- */
+
+.layout { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  background: var(--slate-900);
+  color: var(--slate-100);
+  display: flex;
+  flex-direction: column;
+}
+.sidebar .brand {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid var(--slate-800);
+  font-weight: 700;
+  color: var(--indigo-400);
+}
+.sidebar nav { padding: .75rem; display: flex; flex-direction: column; gap: .25rem; }
+.sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .55rem .75rem;
+  border-radius: 8px;
+  color: var(--slate-300);
+  text-decoration: none;
+  font-size: .875rem;
+  font-weight: 500;
+}
+.sidebar nav a:hover { background: var(--slate-800); color: #fff; }
+.sidebar nav a.active { background: var(--indigo-600); color: #fff; }
+.sidebar .nav-sep {
+  margin: .5rem .75rem .25rem;
+  padding-top: .5rem;
+  border-top: 1px solid var(--slate-800);
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--slate-500);
+}
+
+.content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  height: 64px;
+  background: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 0 1.25rem;
+}
+.topbar .who { text-align: right; line-height: 1.2; }
+.topbar .who strong { display: block; font-size: .875rem; }
+
+main { padding: 1.5rem; flex: 1; }
+.stack { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* --- Componentes --------------------------------------------------------- */
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.15rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--slate-200);
+}
+.card.tight { padding: .85rem; }
+.card.flush { padding: 0; overflow: hidden; }
+
+.grid { display: grid; gap: 1rem; }
+.grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid.auto   { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+
+.row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; }
+.row.between { justify-content: space-between; align-items: center; }
+.row.tight { gap: .4rem; }
+.spacer { flex: 1; }
+
+.kpi { display: flex; align-items: center; gap: .85rem; }
+.kpi .icon { font-size: 1.6rem; flex-shrink: 0; }
+/* Sin flex:1 el bloque de texto se encoge al ancho de la palabra más larga y la
+   etiqueta se parte en tres líneas dentro de una tarjeta estrecha. */
+.kpi > div:last-child { flex: 1; min-width: 0; }
+.kpi .value { font-size: 1.4rem; font-weight: 700; }
+
+/* --- Formularios --------------------------------------------------------- */
+
+label.field { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; color: var(--slate-600); }
+
+input[type="text"], input[type="password"], input[type="email"], input[type="number"],
+input[type="date"], input[type="time"], input[type="search"], select, textarea {
+  width: 100%;
+  padding: .5rem .65rem;
+  border: 1px solid var(--slate-300);
+  border-radius: 8px;
+  font: inherit;
+  font-size: .875rem;
+  color: var(--slate-800);
+  background: #fff;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--indigo-600);
+  box-shadow: 0 0 0 3px var(--indigo-100);
+}
+input:disabled, select:disabled, textarea:disabled { background: var(--slate-50); color: var(--slate-500); }
+textarea { resize: vertical; min-height: 76px; }
+input[type="file"] { font-size: .8rem; padding: .35rem 0; border: 0; }
+
+.checkline { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: var(--slate-600); }
+.checkline input { width: auto; }
+
+.w-sm { max-width: 130px; }
+.w-md { max-width: 220px; }
+
+/* --- Botones ------------------------------------------------------------- */
+
+/* Solo `.btn`, sin `button.btn` ni `a.btn`: al llevar elemento + clase, esos
+   selectores ganaban en especificidad a las variantes (.btn-secondary…) y su
+   `border: 1px solid transparent` dejaba sin borde a todos los botones. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  padding: .5rem .9rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--indigo-600); color: #fff; }
+.btn-primary:hover { background: var(--indigo-700); }
+.btn-secondary { background: #fff; color: var(--slate-700); border-color: var(--slate-300); }
+.btn-secondary:hover { background: var(--slate-50); }
+.btn-danger { background: var(--red-600); color: #fff; }
+.btn-danger:hover { background: var(--red-700); }
+.btn-ghost-danger { background: transparent; color: var(--red-600); border-color: var(--red-200); }
+.btn-ghost-danger:hover { background: var(--red-50); }
+.btn-sm { padding: .3rem .6rem; font-size: .78rem; }
+.btn:disabled, .btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn-block { width: 100%; }
+
+.linkbtn {
+  background: none; border: 0; padding: 0; font: inherit;
+  color: var(--indigo-600); cursor: pointer; text-decoration: underline;
+}
+.linkbtn.danger { color: var(--red-600); }
+
+/* --- Avisos -------------------------------------------------------------- */
+
+.flashes { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1.25rem; }
+.flash {
+  padding: .6rem .85rem;
+  border-radius: 8px;
+  font-size: .875rem;
+  border: 1px solid;
+}
+.flash.success { background: var(--green-50);  border-color: var(--green-100); color: var(--green-700); }
+.flash.error   { background: var(--red-50);    border-color: var(--red-200);   color: var(--red-700); }
+.flash.warning { background: var(--amber-50);  border-color: var(--amber-200); color: var(--amber-700); }
+.flash.info    { background: var(--blue-50);   border-color: var(--blue-100);  color: var(--blue-800); }
+
+.notice {
+  padding: .75rem .9rem; border-radius: 8px; font-size: .85rem;
+  background: var(--slate-50); border: 1px solid var(--slate-200); color: var(--slate-600);
+}
+.empty { color: var(--slate-500); font-size: .875rem; padding: 1.5rem 0; text-align: center; }
+
+/* --- Etiquetas de estado ------------------------------------------------- */
+
+.badge {
+  display: inline-block; padding: .15rem .55rem; border-radius: 999px;
+  font-size: .72rem; font-weight: 600;
+}
+.badge.none    { background: var(--slate-100); color: var(--slate-500); }
+.badge.active  { background: var(--blue-100);  color: var(--blue-800); }
+.badge.expired { background: var(--red-100);   color: var(--red-700); }
+.badge.ok      { background: var(--green-100); color: var(--green-700); }
+.badge.fail    { background: var(--red-100);   color: var(--red-700); }
+.badge.draft   { background: var(--amber-100); color: var(--amber-700); }
+.badge.role    { background: var(--indigo-100); color: var(--indigo-700); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 1rem; font-size: .78rem; color: var(--slate-500); }
+.legend span { display: inline-flex; align-items: center; gap: .35rem; }
+.dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+.dot.none { background: var(--slate-300); }
+.dot.active { background: var(--blue-400); }
+.dot.expired { background: var(--red-400); }
+
+/* --- Fotos --------------------------------------------------------------- */
+
+.avatar {
+  width: 64px; height: 64px; border-radius: 999px; overflow: hidden;
+  background: var(--slate-100); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--slate-400); font-size: 1.35rem; font-weight: 600;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar.sm { width: 38px; height: 38px; font-size: .9rem; }
+.avatar.lg { width: 92px; height: 92px; font-size: 2rem; }
+.thumb {
+  width: 100%; height: 128px; object-fit: cover;
+  border-radius: 8px; background: var(--slate-100);
+}
+.thumb.sm { height: 80px; }
+
+/* --- Toma de foto y editor de encuadre ----------------------------------- */
+
+.photo-capture {
+  display: flex; gap: 1.15rem; align-items: flex-start; flex-wrap: wrap;
+  padding: .9rem; border: 1px solid var(--slate-200); border-radius: 10px;
+  background: var(--slate-50);
+}
+.photo-capture .pc-side { display: flex; flex-direction: column; align-items: center; gap: .35rem; }
+.photo-capture .pc-main { flex: 1; min-width: 260px; }
+.photo-capture .pc-preview { background: #fff; border: 1px solid var(--slate-200); }
+.photo-capture .pc-preview img { width: 100%; height: 100%; object-fit: cover; }
+.photo-capture .pc-empty { font-size: .62rem; color: var(--slate-400); text-align: center; line-height: 1.2; }
+
+.pc-stage {
+  width: 300px; max-width: 100%; height: 300px;
+  border-radius: 10px; overflow: hidden; background: var(--slate-900);
+  display: flex; align-items: center; justify-content: center;
+}
+.pc-stage video {
+  width: 100%; height: 100%; object-fit: cover;
+  /* Espejo: encuadrarse es mucho más natural viéndose como en un espejo.
+     La captura aplica el mismo reflejo, así la foto coincide con la vista previa. */
+  transform: scaleX(-1);
+}
+.pc-stage canvas { width: 300px; height: 300px; cursor: grab; touch-action: none; }
+.pc-stage canvas:active { cursor: grabbing; }
+
+/* --- Tarjetas de persona / producto -------------------------------------- */
+
+.tile {
+  background: #fff; border: 1px solid var(--slate-200); border-radius: 12px;
+  padding: 1rem; text-align: center; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; align-items: center; gap: .5rem;
+}
+.tile .name { font-weight: 600; font-size: .875rem; }
+
+.status-tile {
+  display: block; width: 100%; text-align: center; text-decoration: none;
+  border: 2px solid; border-radius: 12px; padding: 1rem;
+  display: flex; flex-direction: column; align-items: center; gap: .5rem;
+  color: inherit; background: #fff;
+}
+.status-tile:hover { box-shadow: 0 4px 10px rgb(15 23 42 / 10%); }
+.status-tile.none    { background: var(--slate-50); border-color: var(--slate-300); color: var(--slate-600); }
+.status-tile.active  { background: var(--blue-50);  border-color: var(--blue-400);  color: var(--blue-800); }
+.status-tile.expired { background: var(--red-50);   border-color: var(--red-400);   color: var(--red-700); }
+
+.product-tile { position: relative; }
+.product-tile.out { opacity: .5; }
+
+/* --- Tablas -------------------------------------------------------------- */
+
+.table-wrap { overflow-x: auto; max-height: 65vh; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--slate-100); color: var(--slate-500);
+  text-transform: uppercase; font-size: .7rem; letter-spacing: .04em;
+  text-align: left; padding: .6rem .75rem; font-weight: 600;
+}
+tbody td { padding: .55rem .75rem; border-top: 1px solid var(--slate-200); vertical-align: middle; }
+tbody tr:hover { background: var(--slate-50); }
+
+/* --- Gráficas ------------------------------------------------------------ */
+
+.chart { width: 100%; height: auto; display: block; }
+.chart-empty { color: var(--slate-400); font-size: .85rem; text-align: center; padding: 2rem 0; }
+
+/* --- Login --------------------------------------------------------------- */
+
+.login-wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: var(--slate-100); padding: 1rem;
+}
+.login-card { width: 100%; max-width: 380px; background: #fff; padding: 2rem; border-radius: 14px; box-shadow: 0 10px 25px rgb(15 23 42 / 10%); }
+.login-card .logo { text-align: center; margin-bottom: 1.5rem; }
+.login-card .logo .mark { font-size: 2.25rem; }
+
+/* --- Recibos ------------------------------------------------------------- */
+
+.receipt {
+  border: 1px dashed var(--slate-300); border-radius: 10px;
+  padding: 1.25rem; font-size: .875rem; background: #fff;
+}
+.receipt .line { display: flex; justify-content: space-between; padding: .15rem 0; }
+.receipt .sep { border-top: 1px solid var(--slate-200); margin: .6rem 0; }
+.receipt .head { text-align: center; font-weight: 700; margin-bottom: .5rem; }
+
+/* --- Detalle en dos columnas --------------------------------------------- */
+
+.deflist { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .6rem 1.25rem; font-size: .875rem; }
+.deflist .k { color: var(--slate-400); font-size: .75rem; display: block; }
+.deflist .v { color: var(--slate-700); }
+
+/* --- Cuadro de confirmación (details/summary, sin JavaScript) ------------- */
+
+details.confirm { margin: 0; }
+details.confirm > summary {
+  cursor: pointer; list-style: none; display: inline-flex;
+}
+details.confirm > summary::-webkit-details-marker { display: none; }
+details.confirm .panel {
+  margin-top: .75rem; padding: .85rem; border-radius: 8px;
+  background: var(--red-50); border: 1px solid var(--red-200);
+}
+details.confirm .panel p { margin: 0 0 .6rem; font-size: .85rem; color: var(--red-700); }
+
+/* --- Errores ------------------------------------------------------------- */
+
+.error-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+.error-page .box { text-align: center; max-width: 460px; }
+.error-page .code { font-size: 3.5rem; font-weight: 800; color: var(--slate-300); line-height: 1; }
+
+/* --- Responsivo ---------------------------------------------------------- */
+
+/* Cuatro KPI en fila necesitan ~1100px para no quedar apretados; por debajo,
+   dos filas de dos se leen mejor que cuatro columnas estrechas. */
+@media (max-width: 1100px) {
+  .grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Una gráfica de 12 meses en media pantalla queda tan achatada que no se leen las
+   etiquetas del eje; por debajo de 1150px van una encima de otra, a ancho completo. */
+@media (max-width: 1150px) {
+  .grid.cols-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .grid.cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; }
+  .sidebar nav { flex-direction: row; flex-wrap: wrap; }
+  .sidebar .nav-sep { width: 100%; }
+  .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr; }
+  main { padding: 1rem; }
+}
+
+/* --- Impresión: solo el recibo ------------------------------------------- */
+
+@media print {
+  .sidebar, .topbar, .flashes, .no-print { display: none !important; }
+  body { background: #fff; }
+  main { padding: 0; }
+  .card { box-shadow: none; border: 0; }
+  .receipt { border: 0; }
+  .print-only { display: block !important; }
+}
+.print-only { display: none; }
