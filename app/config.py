@@ -3,10 +3,46 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-INSTANCE_DIR = BASE_DIR / "instance"
+
+
+def _is_writable(directory: Path) -> bool:
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        probe = directory / ".escritura"
+        probe.write_bytes(b"")
+        probe.unlink()
+    except OSError:
+        return False
+    return True
+
+
+def _resolve_instance_dir() -> Path:
+    """Carpeta donde viven la base de datos, las fotos y la clave de sesión.
+
+    Ejecutando el código fuente es `instance/` junto al proyecto. En la versión
+    instalada (ejecutable compilado) va junto al .exe, salvo que esa carpeta sea
+    de solo lectura —caso típico de «Archivos de programa»—, en cuyo caso se usa
+    el perfil del usuario. GYMLITE_DATA_DIR permite forzar cualquier ruta.
+    """
+    override = os.environ.get("GYMLITE_DATA_DIR")
+    if override:
+        return Path(override).expanduser()
+
+    if getattr(sys, "frozen", False):
+        beside_exe = Path(sys.executable).resolve().parent / "data"
+        if _is_writable(beside_exe):
+            return beside_exe
+        fallback = os.environ.get("LOCALAPPDATA") or str(Path.home())
+        return Path(fallback) / "GymManager Lite" / "data"
+
+    return BASE_DIR / "instance"
+
+
+INSTANCE_DIR = _resolve_instance_dir()
 UPLOAD_DIR = INSTANCE_DIR / "uploads"
 DATABASE_PATH = INSTANCE_DIR / "gym.db"
 SECRET_KEY_PATH = INSTANCE_DIR / "secret_key"

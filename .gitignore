@@ -7,8 +7,11 @@ env/
 # Base de datos, fotos subidas y clave de sesión: se generan al ejecutar la app.
 instance/
 
-# Paquetes generados por crear-paquete.bat
-GymManagerLite-*.zip
+# Resultado de installer/build.py
+build/
+dist/
+*.spec
+installer/assets/
 
 .env
 *.db

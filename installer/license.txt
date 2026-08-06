@@ -1,0 +1,100 @@
+ACUERDO DE LICENCIA DE USUARIO FINAL
+GymManager Lite
+
+IMPORTANTE: lea este acuerdo antes de instalar el programa. Al marcar la casilla
+de aceptacion y continuar con la instalacion, usted acepta quedar obligado por
+los terminos que se describen a continuacion. Si no esta de acuerdo, cancele la
+instalacion y no utilice el programa.
+
+
+1. OBJETO DE LA LICENCIA
+
+Se le concede una licencia no exclusiva, intransferible y sin limite de tiempo
+para instalar y utilizar GymManager Lite (en adelante, "el Programa") en los
+equipos de su organizacion, con el fin de gestionar clientes, inscripciones,
+inventario y ventas de un gimnasio.
+
+
+2. DERECHOS DE PROPIEDAD
+
+El Programa se licencia, no se vende. El autor conserva la titularidad del
+codigo fuente y de todos los materiales que lo acompanan. Esta licencia no le
+transfiere ningun derecho de propiedad intelectual sobre el Programa.
+
+
+3. USO PERMITIDO
+
+Usted puede:
+
+  a) Instalar y ejecutar el Programa en tantos equipos como necesite dentro de
+     su organizacion.
+  b) Realizar copias de seguridad de sus propios datos.
+  c) Adaptar la configuracion del Programa (tarifas, servicios, catalogo de
+     productos y usuarios) a las necesidades de su negocio.
+
+
+4. RESTRICCIONES
+
+Usted no puede:
+
+  a) Comercializar, alquilar o sublicenciar el Programa a terceros.
+  b) Retirar o alterar los avisos de autoria incluidos en el Programa.
+  c) Utilizar el Programa para fines ilicitos o contrarios a la normativa
+     aplicable.
+
+
+5. DATOS Y PRIVACIDAD
+
+El Programa funciona de forma local: la base de datos, las fotografias y las
+claves de sesion se guardan unicamente en la carpeta de datos del equipo donde
+se instala. El Programa no envia informacion a servidores externos ni requiere
+conexion a internet para funcionar.
+
+Usted es el unico responsable del tratamiento de los datos personales de sus
+clientes y empleados que registre en el Programa, asi como del cumplimiento de
+la legislacion de proteccion de datos que le sea aplicable. Es su
+responsabilidad realizar copias de seguridad periodicas de la carpeta de datos.
+
+
+6. CREDENCIALES INICIALES
+
+La instalacion crea una unica cuenta de administrador con credenciales
+conocidas y publicadas. Usted se compromete a cambiar esa contrasena la primera
+vez que acceda al Programa. El autor no se hace responsable de los accesos no
+autorizados derivados de mantener la contrasena inicial.
+
+
+7. GARANTIA
+
+El Programa se entrega "TAL CUAL", sin garantia de ningun tipo, expresa o
+implicita, incluidas, entre otras, las garantias de comerciabilidad, idoneidad
+para un proposito particular y ausencia de defectos. Usted asume todo el riesgo
+derivado del uso del Programa.
+
+
+8. LIMITACION DE RESPONSABILIDAD
+
+En ningun caso el autor sera responsable de danos directos, indirectos,
+incidentales, especiales o consecuentes, incluida la perdida de datos, la
+perdida de beneficios o la interrupcion de la actividad, derivados del uso o de
+la imposibilidad de usar el Programa, incluso si se le hubiera advertido de la
+posibilidad de tales danos.
+
+
+9. VIGENCIA Y TERMINACION
+
+Esta licencia permanece vigente hasta que usted desinstale el Programa. El
+incumplimiento de cualquiera de estos terminos supone la terminacion automatica
+de la licencia, en cuyo caso debera desinstalar el Programa de todos sus
+equipos.
+
+
+10. COMPONENTES DE TERCEROS
+
+El Programa incorpora software de terceros distribuido bajo sus propias
+licencias de codigo abierto, entre ellos Python (licencia PSF), Flask, Werkzeug
+y Jinja2 (licencia BSD de 3 clausulas). Dichos componentes se rigen por sus
+respectivas licencias, cuyos terminos prevalecen para esos componentes.
+
+
+Fin del acuerdo de licencia.
