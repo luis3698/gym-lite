@@ -239,7 +239,7 @@ Al terminar imprime la ruta y el tamaño del resultado:
 ==============================================================
   COMPILACIÓN COMPLETADA
 ==============================================================
-  Instalador: F:\claude code\gym lite\dist\GymManagerLite-Setup.exe
+  Instalador: gym lite\dist\GymManagerLite-Setup.exe
   Tamaño:     39.8 MB
 ==============================================================
 ```

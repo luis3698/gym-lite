@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 venv/
 env/
+.claude/
 
 # Base de datos, fotos subidas y clave de sesión: se generan al ejecutar la app.
 instance/
