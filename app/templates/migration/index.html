@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Migración de datos — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Migración de datos</h1>
+    <p class="muted">
+      Cargar los socios que ya tenía el gimnasio antes de usar este programa.
+    </p>
+  </div>
+
+  <div class="notice">
+    <strong>No se genera recibo.</strong> Esa gente ya pagó por otro canal, así que estas
+    inscripciones se registran con importe cero y quedan <strong>fuera del registro de
+    ventas e ingresos</strong>: si contaran, el informe mostraría un dinero que nunca
+    entró por caja. Quedan marcadas como migradas y funcionan igual que cualquier otra
+    para el acceso, los vencimientos y las renovaciones.
+    {% if migrados %}
+      <br><br>Ya hay <strong>{{ migrados }}</strong> inscripción(es) migrada(s).
+    {% endif %}
+  </div>
+
+  {# --- Opción 1: archivo ---------------------------------------------------- #}
+  <div class="card">
+    <h2 style="margin:0 0 .3rem">📄 Importar un listado completo</h2>
+    <p class="tiny muted" style="margin:0 0 .9rem">
+      Lo más rápido si son muchos. Descargue la plantilla, rellénela en Excel y súbala.
+      Antes de guardar nada se le mostrará fila por fila lo que se va a hacer y lo que
+      está mal, para que pueda corregirlo.
+    </p>
+
+    <div class="row">
+      <a class="btn btn-secondary" href="{{ url_for('migration.template_csv') }}">
+        ⬇️ Descargar plantilla
+      </a>
+
+      <form method="post" action="{{ url_for('migration.analyze') }}"
+            enctype="multipart/form-data" class="row" style="flex:1;min-width:280px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field" style="flex:1">
+          <span>Archivo CSV</span>
+          <input type="file" name="archivo" accept=".csv,text/csv" required>
+        </label>
+        <button class="btn btn-primary">Analizar archivo</button>
+      </form>
+    </div>
+
+    <details class="fieldset" style="margin-top:1rem">
+      <summary><span class="bold">Qué columnas lleva la plantilla</span></summary>
+      <table style="margin-top:.6rem">
+        <thead><tr><th>#</th><th>Columna</th><th>¿Obligatoria?</th></tr></thead>
+        <tbody>
+          {% for clave, etiqueta, obligatoria in columnas %}
+            <tr>
+              <td class="muted">{{ loop.index }}</td>
+              <td>{{ etiqueta }}</td>
+              <td>{{ 'Sí' if obligatoria else 'No' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="tiny muted" style="margin:.6rem 0 0">
+        Las columnas se leen <strong>por posición</strong>, así que puede reescribir los
+        títulos sin problema; lo que no debe hacer es cambiarlas de orden. Si deja el
+        vencimiento vacío se calcula solo a partir de la duración y la cantidad; rellénelo
+        cuando la fecha real no cuadre con las tarifas (medias mensualidades, cortesías…).
+        Máximo {{ max_rows }} filas por archivo.
+      </p>
+    </details>
+  </div>
+
+  {# --- Opción 2: uno a uno -------------------------------------------------- #}
+  <div class="card">
+    <h2 style="margin:0 0 .3rem">✍️ Registrar un socio</h2>
+    <p class="tiny muted" style="margin:0 0 .9rem">
+      Para casos sueltos. Crea la ficha del cliente y su inscripción de una vez.
+    </p>
+
+    <form method="post" action="{{ url_for('migration.manual') }}" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="grid cols-4">
+        <label class="field"><span>Nombre *</span>
+          <input type="text" name="nombre" required></label>
+        <label class="field"><span>Apellido *</span>
+          <input type="text" name="apellido" required></label>
+        <label class="field"><span>Número de identidad *</span>
+          <input type="text" name="documento" required></label>
+        <label class="field"><span>Teléfono</span>
+          <input type="text" name="telefono"></label>
+
+        <label class="field"><span>Sexo</span>
+          <select name="sexo">
+            <option value="">Sin especificar</option>
+            {% for s in SEX_OPTIONS %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          </select></label>
+        <label class="field"><span>Edad</span>
+          <input type="number" name="edad" min="0" max="120"></label>
+        <label class="field"><span>Correo electrónico</span>
+          <input type="email" name="correo"></label>
+        <label class="field"><span>Tipo de sangre</span>
+          <select name="tipo_sangre">
+            <option value="">Sin especificar</option>
+            {% for b in BLOOD_TYPES %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
+          </select></label>
+      </div>
+
+      <p class="small bold" style="margin:.5rem 0 0">Inscripción que ya tenía</p>
+      <div class="grid cols-4">
+        <label class="field"><span>Duración *</span>
+          <select name="duracion" required>
+            {% for key, label in DURATIONS.items() %}
+              <option value="{{ key }}" {{ 'selected' if key == 'MONTH' }}>{{ label }}</option>
+            {% endfor %}
+          </select></label>
+        <label class="field"><span>Cantidad</span>
+          <input type="number" name="cantidad" min="1" max="{{ max_quantity }}" value="1"></label>
+        <label class="field"><span>Fecha de inicio *</span>
+          <input type="date" name="inicio" value="{{ hoy }}" required></label>
+        <label class="field">
+          <span>Vencimiento <span class="muted">(opcional)</span></span>
+          <input type="date" name="vencimiento">
+          <span class="tiny muted">Si lo deja vacío se calcula solo.</span>
+        </label>
+      </div>
+
+      <div class="row">
+        <button class="btn btn-primary">Registrar socio migrado</button>
+        <span class="tiny muted">No se emitirá recibo ni contará como ingreso.</span>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

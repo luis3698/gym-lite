@@ -240,7 +240,7 @@ Al terminar imprime la ruta y el tamaño del resultado:
   COMPILACIÓN COMPLETADA
 ==============================================================
   Instalador: gym lite\dist\GymManagerLite-Setup.exe
-  Tamaño:     39.8 MB
+  Tamaño:     48.7 MB
 ==============================================================
 ```
 
@@ -289,10 +289,10 @@ Cuando haga cambios y quiera distribuirlos:
 
 ```python
 # installer/build.py
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.2"
 
 # installer/installer.py
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.2"
 ```
 
 La versión se ve en la portada del asistente, en las propiedades del `.exe` (pestaña

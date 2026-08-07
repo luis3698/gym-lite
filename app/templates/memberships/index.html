@@ -43,6 +43,7 @@
   <div class="legend">
     <span><i class="dot none"></i> Sin inscripción</span>
     <span><i class="dot active"></i> Vigente</span>
+    <span><i class="dot paused"></i> En pausa</span>
     <span><i class="dot expired"></i> Vencida</span>
     <span class="spacer"></span>
     <span>Mostrando {{ board | length }} cliente(s)</span>
@@ -61,6 +62,8 @@
           <p class="tiny bold" style="margin:0">
             {% if item.status == 'active' %}
               Vigente — {{ item.days_left }} día(s) restante(s)
+            {% elif item.status == 'paused' %}
+              ⏸️ En pausa
             {% elif item.status == 'expired' %}
               Venció el {{ item.client['membership_end'] | fecha }}
               {% if item.days_left is not none %}<br>(hace {{ -item.days_left }} día(s)){% endif %}
@@ -75,6 +78,7 @@
     <div class="card">
       <p class="empty">
         {% if status_filter == 'active' %}Ningún cliente tiene una inscripción vigente.
+        {% elif status_filter == 'paused' %}Ninguna inscripción está en pausa.
         {% elif status_filter == 'expired' %}Ningún cliente tiene la inscripción vencida.
         {% elif status_filter == 'none' %}Todos los clientes tienen alguna inscripción registrada.
         {% else %}No se encontraron clientes registrados.{% endif %}

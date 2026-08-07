@@ -40,6 +40,7 @@ from ..faces import (
     serialize_descriptor,
 )
 from ..helpers import (
+    active_membership_sql,
     duration_label,
     format_date,
     format_datetime,
@@ -225,12 +226,15 @@ def _client_card(client_id: int) -> dict:
         return {}
 
     membership = query_one(
-        """SELECT duration_type, quantity, start_date, end_date
+        """SELECT duration_type, quantity, start_date, end_date, paused_at
              FROM memberships WHERE client_id = ?
             ORDER BY end_date DESC, id DESC LIMIT 1""",
         (client_id,),
     )
-    status, days_left = membership_status(membership["end_date"] if membership else None)
+    status, days_left = membership_status(
+        membership["end_date"] if membership else None,
+        membership["paused_at"] if membership else None,
+    )
 
     card = {
         "id": client["id"],
@@ -264,12 +268,23 @@ def _decide(client_id: int) -> tuple[bool, str]:
     )
     if not has_any:
         return False, "NO_MEMBERSHIP"
+
     is_active = query_value(
-        "SELECT COUNT(*) FROM memberships WHERE client_id = ? AND end_date > ?",
+        f"SELECT COUNT(*) FROM memberships WHERE client_id = ? AND {active_membership_sql()}",
         (client_id, today_str()),
         0,
     )
-    return (True, "ACTIVE") if is_active else (False, "EXPIRED")
+    if is_active:
+        return True, "ACTIVE"
+
+    # Se distingue la pausa del vencimiento: al socio hay que decirle cosas distintas
+    # («reanude su inscripción» no es lo mismo que «renuévela»).
+    is_paused = query_value(
+        "SELECT COUNT(*) FROM memberships WHERE client_id = ? AND paused_at IS NOT NULL",
+        (client_id,),
+        0,
+    )
+    return (False, "PAUSED") if is_paused else (False, "EXPIRED")
 
 
 def _seconds_since_last(client_id: int) -> int | None:

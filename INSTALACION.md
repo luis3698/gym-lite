@@ -43,7 +43,22 @@ pequeña y, a continuación, el navegador con **dos pestañas**: el programa y e
 
 > ⚠️ Cambie esa contraseña la primera vez, desde **Mi cuenta → Cambiar contraseña**.
 
-### Paso 4 — Configurar las tarifas
+### Paso 4 — Cargar los socios que ya tenía
+
+Si el gimnasio ya funcionaba antes, entre en **Administración → Migración de datos**.
+Hay dos caminos:
+
+- **Importar un listado completo.** Descargue la plantilla, rellénela en Excel con todos
+  sus socios y súbala. Antes de guardar nada verá fila por fila lo que se va a hacer y
+  qué está mal (documentos repetidos, fechas inválidas, gente que ya existe), para poder
+  corregirlo. Se guardan todas de una vez: nunca queda una importación a medias.
+- **Registrar un socio.** Un formulario con todos los campos, para casos sueltos.
+
+> Estas inscripciones **no generan recibo** y **no cuentan como ingreso**: ese dinero se
+> cobró antes de usar el programa, y contarlo falsearía el informe de ventas. Por lo
+> demás funcionan igual que cualquier otra: vencen, se renuevan y dan acceso por el kiosco.
+
+### Paso 5 — Configurar las tarifas
 
 > Las tarifas se cobran por **cantidad**: si fija «1 día» en $10.000, un cliente que
 > quiera pagar 5 días paga $50.000. Lo mismo con semanas y quincenas. Las mensualidades
@@ -57,6 +72,59 @@ que faltan al intentar registrar una mensualidad.
 
 Los productos, los servicios complementarios y los clientes se dan de alta desde sus
 respectivos módulos.
+
+---
+
+## Pausar una inscripción
+
+Cuando un socio se va de viaje, se lesiona o quiere congelar su mensualidad, entre en
+**Inscripción de gym → el cliente → «⏸️ Pausar inscripción»**.
+
+- Se guardan **los días que le quedaban**.
+- Mientras esté en pausa **no cuenta como vigente** y el kiosco no le dará acceso, pero
+  tampoco aparece como moroso en el panel: no es lo mismo deber que estar congelado.
+- Al pulsar **«▶️ Reanudar»**, el vencimiento se recalcula desde ese día con los días
+  guardados. Si le quedaban 12 días y vuelve tres meses después, sigue teniendo 12.
+
+En el tablero de inscripciones hay un filtro **«Solo inscripciones en pausa»** para
+verlos de un vistazo.
+
+---
+
+## Ficha deportiva e índices corporales
+
+En la ficha de cada cliente (**Registro de usuarios → el cliente**) puede anotar altura,
+peso, tipo de sangre, objetivo, alergias y **once perímetros corporales**: cuello,
+hombros, pecho, bíceps relajado y en tensión, antebrazo, cintura, cadera, muslo superior
+y medio, y pantorrilla. Todo es opcional.
+
+Con esos datos el programa calcula automáticamente:
+
+| Índice | Qué necesita |
+|---|---|
+| Índice de masa corporal (IMC) | altura y peso |
+| Porcentaje de grasa corporal | altura, cuello y cintura (en mujeres además cadera) y sexo |
+| Índice cintura/cadera | cintura y cadera |
+| Índice cintura/estatura | cintura y altura |
+
+Si falta algún dato no se inventa un número: la ficha dice qué falta para poder calcularlo.
+
+### Ajustar la interpretación
+
+En **Administración → Índices corporales** decide qué índices se muestran y, sobre todo,
+**cómo se interpreta cada valor**. Cada índice tiene una tabla de rangos con su etiqueta
+y su color, y cada fila puede aplicarse solo a un sexo o a una franja de edad.
+
+Vienen cargados los valores habituales (OMS para el IMC, etc.), y siempre puede volver a
+ellos con **«Restaurar valores de fábrica»**.
+
+> Cada rango incluye el mínimo y excluye el máximo, de modo que 18,5–25 y 25–30 encajan
+> sin huecos. Cuando varias filas encajan gana la más específica: puede dejar un rango
+> general y añadir excepciones por edad o sexo encima.
+>
+> La **fórmula** de cada índice no se puede editar, a propósito: un error en una fórmula
+> daría un dato de salud equivocado sin que nada avisara, y estos números se le enseñan
+> al socio.
 
 ---
 

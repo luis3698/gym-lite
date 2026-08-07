@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
 from ..config import (
@@ -10,16 +12,19 @@ from ..config import (
     VALID_DURATIONS,
     VALID_PAYMENT_METHODS,
 )
-from ..db import query_all, query_one, query_value, transaction
+from ..db import execute, query_all, query_one, query_value, transaction
 from ..faces import client_face_count
 from ..helpers import (
     DATE_FMT,
+    active_membership_sql,
     compute_end_date,
     duration_label,
+    format_date,
     membership_status,
     now_str,
     optional_string,
     parse_date,
+    today,
     today_str,
 )
 from ..security import audit, roles_required
@@ -60,6 +65,7 @@ def _load_tariffs() -> dict:
 STATUS_FILTERS = {
     "": "Todos los estados",
     "active": "Solo inscripciones vigentes",
+    "paused": "Solo inscripciones en pausa",
     "expired": "Solo inscripciones vencidas",
     "none": "Sin inscripción",
 }
@@ -78,6 +84,7 @@ def index():
                m.id            AS membership_id,
                m.duration_type AS membership_duration,
                m.quantity      AS membership_quantity,
+               m.paused_at     AS membership_paused,
                m.end_date      AS membership_end,
                m.total         AS membership_total
           FROM clients c
@@ -98,11 +105,13 @@ def index():
     # El filtro se aplica en SQL y no después en Python, para que el conteo y el orden
     # correspondan al conjunto realmente filtrado.
     if status_filter == "active":
-        sql += " AND m.id IS NOT NULL AND m.end_date > ?"
+        sql += f" AND m.id IS NOT NULL AND {active_membership_sql('m')}"
         params.append(today_str())
     elif status_filter == "expired":
-        sql += " AND m.id IS NOT NULL AND m.end_date <= ?"
+        sql += " AND m.id IS NOT NULL AND m.end_date <= ? AND m.paused_at IS NULL"
         params.append(today_str())
+    elif status_filter == "paused":
+        sql += " AND m.paused_at IS NOT NULL"
     elif status_filter == "none":
         sql += " AND m.id IS NULL"
 
@@ -111,26 +120,34 @@ def index():
 
     board = []
     for row in query_all(sql, params):
-        status, days_left = membership_status(row["membership_end"])
+        status, days_left = membership_status(row["membership_end"], row["membership_paused"])
         board.append({"client": row, "status": status, "days_left": days_left})
 
     # Contadores para las pestañas del filtro, sobre el total (no sobre lo filtrado).
     today_iso = today_str()
+    vigente = active_membership_sql()
     counts = {
         "active": query_value(
-            """SELECT COUNT(*) FROM clients c WHERE EXISTS
-                 (SELECT 1 FROM memberships WHERE client_id = c.id AND end_date > ?)""",
+            f"""SELECT COUNT(*) FROM clients c WHERE EXISTS
+                  (SELECT 1 FROM memberships WHERE client_id = c.id AND {vigente})""",
             (today_iso,), 0),
+        "paused": query_value(
+            """SELECT COUNT(*) FROM clients c WHERE EXISTS
+                 (SELECT 1 FROM memberships WHERE client_id = c.id AND paused_at IS NOT NULL)""",
+            (), 0),
         "expired": query_value(
-            """SELECT COUNT(*) FROM clients c
-                WHERE EXISTS (SELECT 1 FROM memberships WHERE client_id = c.id)
-                  AND NOT EXISTS (SELECT 1 FROM memberships WHERE client_id = c.id AND end_date > ?)""",
+            f"""SELECT COUNT(*) FROM clients c
+                 WHERE EXISTS (SELECT 1 FROM memberships WHERE client_id = c.id)
+                   AND NOT EXISTS (SELECT 1 FROM memberships WHERE client_id = c.id
+                                    AND ({vigente} OR paused_at IS NOT NULL))""",
             (today_iso,), 0),
         "none": query_value(
             "SELECT COUNT(*) FROM clients c WHERE NOT EXISTS (SELECT 1 FROM memberships WHERE client_id = c.id)",
             (), 0),
     }
-    counts[""] = counts["active"] + counts["expired"] + counts["none"]
+    # Las pausadas sí se suman: un cliente en pausa no está en ninguna de las otras
+    # categorías (no está vigente, pero tampoco vencido ni sin inscripción).
+    counts[""] = counts["active"] + counts["expired"] + counts["none"] + counts["paused"]
 
     return render_template(
         "memberships/index.html",
@@ -155,7 +172,10 @@ def manage(client_id: int):
         "SELECT * FROM memberships WHERE client_id = ? ORDER BY end_date DESC, id DESC LIMIT 1",
         (client_id,),
     )
-    status, days_left = membership_status(current["end_date"] if current else None)
+    status, days_left = membership_status(
+        current["end_date"] if current else None,
+        current["paused_at"] if current else None,
+    )
 
     if request.method == "POST":
         try:
@@ -251,6 +271,89 @@ def _create_membership(client, form, tariffs) -> int:
         f"cliente {client['document_id']} - {duration_label(duration, quantity)} - {total}",
     )
     return membership_id
+
+
+@bp.post("/<int:membership_id>/pausar")
+@roles_required("ADMIN", "CAJA")
+def pause(membership_id: int):
+    """Congela la inscripción guardando los días que le quedaban.
+
+    No se toca `end_date`: mientras está pausada esa fecha ya no significa nada (la
+    regla de vigencia exige además `paused_at IS NULL`), y conservarla permite deshacer
+    la pausa el mismo día dejándolo todo exactamente como estaba.
+    """
+    membership = query_one("SELECT * FROM memberships WHERE id = ?", (membership_id,))
+    if membership is None:
+        flash("Inscripción no encontrada.", "error")
+        return redirect(url_for("memberships.index"))
+
+    back = redirect(url_for("memberships.manage", client_id=membership["client_id"]))
+
+    if membership["paused_at"]:
+        flash("Esa inscripción ya está en pausa.", "warning")
+        return back
+
+    end = parse_date(membership["end_date"])
+    days_left = (end - today()).days if end else 0
+    if days_left <= 0:
+        flash(
+            "No se puede pausar una inscripción vencida: no le quedan días que guardar. "
+            "Registre una nueva.",
+            "error",
+        )
+        return back
+
+    execute(
+        "UPDATE memberships SET paused_at = ?, paused_days = ? WHERE id = ?",
+        (today_str(), days_left, membership_id),
+    )
+    audit("MEMBERSHIP_PAUSED", f"inscripción id={membership_id} con {days_left} día(s) guardados")
+    flash(
+        f"Inscripción pausada. Se guardaron {days_left} día(s); al reanudarla volverá a "
+        "contar desde ese momento.",
+        "success",
+    )
+    return back
+
+
+@bp.post("/<int:membership_id>/reanudar")
+@roles_required("ADMIN", "CAJA")
+def resume(membership_id: int):
+    """Reanuda la inscripción: vence dentro de los días que se guardaron al pausarla."""
+    membership = query_one("SELECT * FROM memberships WHERE id = ?", (membership_id,))
+    if membership is None:
+        flash("Inscripción no encontrada.", "error")
+        return redirect(url_for("memberships.index"))
+
+    back = redirect(url_for("memberships.manage", client_id=membership["client_id"]))
+
+    if not membership["paused_at"]:
+        flash("Esa inscripción no está en pausa.", "warning")
+        return back
+
+    # Si la fila quedara sin días guardados (base editada a mano), se recalcula desde
+    # la fecha de pausa en vez de dejar al cliente sin vigencia.
+    days_left = membership["paused_days"]
+    if not days_left or days_left < 1:
+        paused_on = parse_date(membership["paused_at"])
+        end = parse_date(membership["end_date"])
+        days_left = max(1, (end - paused_on).days) if (paused_on and end) else 1
+
+    new_end = today() + timedelta(days=days_left)
+    execute(
+        "UPDATE memberships SET end_date = ?, paused_at = NULL, paused_days = NULL WHERE id = ?",
+        (new_end.strftime(DATE_FMT), membership_id),
+    )
+    audit(
+        "MEMBERSHIP_RESUMED",
+        f"inscripción id={membership_id}, {days_left} día(s), vence {new_end.strftime(DATE_FMT)}",
+    )
+    flash(
+        f"Inscripción reanudada con los {days_left} día(s) que le quedaban. "
+        f"Nuevo vencimiento: {format_date(new_end)}.",
+        "success",
+    )
+    return back
 
 
 @bp.post("/<int:membership_id>/cancelar")

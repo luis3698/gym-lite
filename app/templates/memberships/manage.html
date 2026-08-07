@@ -19,27 +19,68 @@
   </div>
 
   {% if current %}
-    {# Las vencidas también se pueden cancelar: mientras el registro exista, la clave
-       foránea impide eliminar al cliente desde "Registro de usuarios". #}
-    <div class="card" style="border-color: {{ 'var(--red-200)' if status == 'expired' else 'var(--blue-100)' }};
-                             background: {{ 'var(--red-50)' if status == 'expired' else 'var(--blue-50)' }}">
+    {# Tres estados posibles: vigente, en pausa y vencida. Cada uno con su color, su
+       texto y las acciones que tienen sentido en ese momento. #}
+    {% set colores = {
+        'active':  ('var(--blue-100)',  'var(--blue-50)',  'var(--blue-800)',  'var(--blue-700)'),
+        'paused':  ('var(--amber-200)', 'var(--amber-50)', 'var(--amber-700)', 'var(--amber-700)'),
+        'expired': ('var(--red-200)',   'var(--red-50)',   'var(--red-700)',   'var(--red-700)')
+    } %}
+    {% set c = colores.get(status, colores['active']) %}
+
+    <div class="card" style="border-color:{{ c[0] }};background:{{ c[1] }}">
       <div class="row between">
         <div>
-          <h2 style="margin:0;color:{{ 'var(--red-700)' if status == 'expired' else 'var(--blue-800)' }}">
-            {{ 'Inscripción vencida' if status == 'expired' else 'Inscripción vigente' }}
+          <h2 style="margin:0;color:{{ c[2] }}">
+            {% if status == 'paused' %}⏸️ Inscripción en pausa
+            {% elif status == 'expired' %}Inscripción vencida
+            {% else %}Inscripción vigente{% endif %}
           </h2>
-          <p class="small" style="margin:.35rem 0 0;color:{{ 'var(--red-700)' if status == 'expired' else 'var(--blue-700)' }}">
+
+          <p class="small" style="margin:.35rem 0 0;color:{{ c[3] }}">
             {{ duracion(current['duration_type'], current['quantity']) }}
-            — {{ 'venció' if status == 'expired' else 'vence' }} {{ current['end_date'] | fecha }}
-            {% if status == 'active' %}({{ days_left }} día(s) restante(s)){% endif %}
+            {% if status == 'paused' %}
+              — pausada el {{ current['paused_at'] | fecha }},
+              con <strong>{{ current['paused_days'] }} día(s) guardados</strong>
+            {% elif status == 'expired' %}
+              — venció {{ current['end_date'] | fecha }}
+            {% else %}
+              — vence {{ current['end_date'] | fecha }} ({{ days_left }} día(s) restante(s))
+            {% endif %}
           </p>
-          <p class="tiny" style="margin:.5rem 0 0;color:var(--slate-600)">
-            Para eliminar el registro de este cliente primero debe cancelar esta inscripción:
-            mientras exista, el sistema no permite borrarlo.
-          </p>
+
+          {% if status == 'paused' %}
+            <p class="tiny" style="margin:.5rem 0 0;color:var(--amber-700)">
+              Mientras esté en pausa no cuenta como vigente y el kiosco no le dará acceso.
+              Al reanudarla volverá a tener sus {{ current['paused_days'] }} día(s), contados
+              desde ese momento.
+            </p>
+          {% else %}
+            <p class="tiny" style="margin:.5rem 0 0;color:var(--slate-600)">
+              Para eliminar el registro de este cliente primero debe cancelar esta inscripción:
+              mientras exista, el sistema no permite borrarlo.
+            </p>
+          {% endif %}
         </div>
+
         <div class="row tight">
           <a class="btn btn-secondary btn-sm" href="{{ url_for('memberships.receipt', membership_id=current['id']) }}">Ver recibo</a>
+
+          {% if status == 'paused' %}
+            <form method="post" action="{{ url_for('memberships.resume', membership_id=current['id']) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-primary btn-sm">▶️ Reanudar inscripción</button>
+            </form>
+          {% elif status == 'active' %}
+            {{ confirm_form(
+                url_for('memberships.pause', membership_id=current['id']),
+                'Se guardarán los ' ~ days_left ~ ' día(s) que le quedan. Mientras esté en pausa el cliente no podrá entrar, y al reanudarla recuperará esos días contados desde ese momento.',
+                'Sí, pausar inscripción',
+                '⏸️ Pausar inscripción',
+                extra_class='btn-secondary btn-sm'
+            ) }}
+          {% endif %}
+
           {{ confirm_form(
               url_for('memberships.cancel', membership_id=current['id']),
               '¿Seguro que desea cancelar esta inscripción? Esta acción no se puede deshacer.',

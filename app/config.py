@@ -140,6 +140,24 @@ ACTIVITY_LEVELS = ("Principiante", "Intermedio", "Avanzado")
 MAX_HEIGHT_CM = 260
 MAX_WEIGHT_KG = 400
 
+# Perímetros corporales, en centímetros: (columna, etiqueta, pista).
+# El orden es el de una toma de medidas real, de arriba abajo, para que quien las está
+# tomando no tenga que saltar por el formulario.
+BODY_MEASUREMENTS = (
+    ("m_neck", "Cuello", "por debajo de la nuez"),
+    ("m_shoulders", "Hombros", "en la parte más ancha"),
+    ("m_chest", "Pecho / tórax", "a la altura de los pezones"),
+    ("m_biceps_relaxed", "Bíceps relajado", "brazo caído"),
+    ("m_biceps_flexed", "Bíceps en tensión", "brazo flexionado"),
+    ("m_forearm", "Antebrazo", "en la parte más ancha"),
+    ("m_waist", "Cintura", "en el punto más estrecho"),
+    ("m_hip", "Cadera / glúteos", "en la zona de mayor volumen"),
+    ("m_thigh_upper", "Muslo superior", "justo bajo el glúteo"),
+    ("m_thigh_mid", "Muslo medio", "a media distancia con la rodilla"),
+    ("m_calf", "Pantorrilla", "en la parte más ancha"),
+)
+MAX_MEASUREMENT_CM = 300
+
 # Topes defensivos: evitan que un formulario manipulado genere fechas de vencimiento
 # absurdas o cantidades imposibles de cobrar.
 # Cuántas veces se puede comprar de golpe la misma duración (60 días, 60 meses…).
@@ -173,6 +191,8 @@ ACTION_LABELS = {
     "CLIENT_DELETE_FAILED": "Intento fallido de eliminar cliente",
     "MEMBERSHIP_CREATED": "Inscripción de gimnasio registrada",
     "MEMBERSHIP_CANCELLED": "Inscripción de gimnasio cancelada",
+    "MEMBERSHIP_PAUSED": "Inscripción pausada",
+    "MEMBERSHIP_RESUMED": "Inscripción reanudada",
     "PRODUCT_CREATED": "Producto creado",
     "PRODUCT_UPDATED": "Producto editado",
     "PRODUCT_DELETED": "Producto eliminado",
@@ -181,6 +201,12 @@ ACTION_LABELS = {
     "FACE_REMOVED": "Rostro eliminado del acceso",
     "FACE_TOGGLED": "Reconocimiento facial activado o desactivado",
     "FACE_COOLDOWN_CHANGED": "Antirrebote del kiosco modificado",
+    "MIGRATION_MANUAL": "Socio migrado manualmente",
+    "MIGRATION_IMPORT": "Socios importados desde archivo",
+    "INDEX_TOGGLED": "Índice corporal activado o desactivado",
+    "INDEX_RANGE_ADDED": "Rango de índice corporal añadido",
+    "INDEX_RANGE_DELETED": "Rango de índice corporal eliminado",
+    "INDEX_RANGES_RESTORED": "Rangos de índice corporal restaurados",
 }
 
 # Motivos del kiosco: el código que se guarda en access_logs.reason y el texto que se
@@ -188,6 +214,7 @@ ACTION_LABELS = {
 ACCESS_REASONS = {
     "ACTIVE": "Inscripción vigente",
     "EXPIRED": "Inscripción vencida",
+    "PAUSED": "Inscripción en pausa",
     "NO_MEMBERSHIP": "Sin inscripción registrada",
     "UNKNOWN": "Rostro no reconocido",
 }

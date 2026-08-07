@@ -39,6 +39,12 @@
         <a href="{{ url_for('users.index') }}" class="{{ 'active' if request.endpoint in ('users.index', 'users.create', 'users.edit') }}">
           <span>👥</span> Administrar usuarios
         </a>
+        <a href="{{ url_for('migration.index') }}" class="{{ 'active' if request.blueprint == 'migration' }}">
+          <span>📥</span> Migración de datos
+        </a>
+        <a href="{{ url_for('body.index') }}" class="{{ 'active' if request.blueprint == 'body' }}">
+          <span>📐</span> Índices corporales
+        </a>
         <a href="{{ url_for('income.index') }}" class="{{ 'active' if request.blueprint == 'income' }}">
           <span>💰</span> Ventas e ingresos
         </a>

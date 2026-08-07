@@ -9,7 +9,7 @@ from flask import Blueprint, render_template
 from ..charts import bar_chart, line_chart
 from ..config import STAFF_ROLES
 from ..db import query_all, query_value
-from ..helpers import DATE_FMT, month_label, today
+from ..helpers import DATE_FMT, active_membership_sql, month_label, today
 from ..security import roles_required
 
 bp = Blueprint("dashboard", __name__)
@@ -42,11 +42,15 @@ def index():
     # "Usuarios activos" cuenta clientes distintos con inscripción vigente;
     # "Inscripciones vigentes" cuenta inscripciones. Son cifras distintas cuando un
     # cliente tiene más de una.
+    vigente = active_membership_sql()
     active_clients = query_value(
-        "SELECT COUNT(DISTINCT client_id) FROM memberships WHERE end_date > ?", (today_iso,), 0
+        f"SELECT COUNT(DISTINCT client_id) FROM memberships WHERE {vigente}", (today_iso,), 0
     )
     active_memberships = query_value(
-        "SELECT COUNT(*) FROM memberships WHERE end_date > ?", (today_iso,), 0
+        f"SELECT COUNT(*) FROM memberships WHERE {vigente}", (today_iso,), 0
+    )
+    paused_memberships = query_value(
+        "SELECT COUNT(*) FROM memberships WHERE paused_at IS NOT NULL", (), 0
     )
     sales_today = query_value(
         "SELECT COALESCE(SUM(total), 0) FROM sales WHERE created_at BETWEEN ? AND ?",
@@ -80,18 +84,21 @@ def index():
     # --- Clientes con la inscripción vencida -----------------------------
     # Solo los que NO tienen ninguna inscripción vigente: si renovaron, su
     # inscripción anterior está vencida pero el cliente está al día.
+    # Quien tiene la inscripción en pausa no es un moroso: no aparece aquí, porque la
+    # congeló a propósito y esos días se le devuelven al reanudar.
     expired_clients = query_all(
-        """SELECT c.id, c.first_name, c.last_name, c.document_id, c.phone, c.email, c.photo,
-                  m.end_date, m.duration_type, m.quantity, m.total,
-                  CAST(julianday(?) - julianday(m.end_date) AS INTEGER) AS days_expired
-             FROM clients c
-             JOIN memberships m
-               ON m.id = (SELECT id FROM memberships
-                           WHERE client_id = c.id ORDER BY end_date DESC, id DESC LIMIT 1)
-            WHERE m.end_date <= ?
-              AND NOT EXISTS (SELECT 1 FROM memberships
-                               WHERE client_id = c.id AND end_date > ?)
-            ORDER BY m.end_date DESC""",
+        f"""SELECT c.id, c.first_name, c.last_name, c.document_id, c.phone, c.email, c.photo,
+                   m.end_date, m.duration_type, m.quantity, m.total,
+                   CAST(julianday(?) - julianday(m.end_date) AS INTEGER) AS days_expired
+              FROM clients c
+              JOIN memberships m
+                ON m.id = (SELECT id FROM memberships
+                            WHERE client_id = c.id ORDER BY end_date DESC, id DESC LIMIT 1)
+             WHERE m.end_date <= ? AND m.paused_at IS NULL
+               AND NOT EXISTS (SELECT 1 FROM memberships
+                                WHERE client_id = c.id
+                                  AND ({vigente} OR paused_at IS NOT NULL))
+             ORDER BY m.end_date DESC""",
         (today_iso, today_iso, today_iso),
     )
 
@@ -104,7 +111,7 @@ def index():
              JOIN memberships m
                ON m.id = (SELECT id FROM memberships
                            WHERE client_id = c.id ORDER BY end_date DESC, id DESC LIMIT 1)
-            WHERE m.end_date > ? AND m.end_date <= ?
+            WHERE m.end_date > ? AND m.end_date <= ? AND m.paused_at IS NULL
             ORDER BY m.end_date ASC""",
         (today_iso, today_iso, in_7_days),
     )
@@ -158,6 +165,7 @@ def index():
             # si un cliente tuviera dos inscripciones venciendo, el indicador y el
             # listado mostrarían cifras distintas.
             "expiring_soon": len(expiring_clients),
+            "paused": paused_memberships,
             "today_income": (sales_today or 0) + (memberships_today or 0),
             "total_clients": total_clients,
             "expired_count": len(expired_clients),

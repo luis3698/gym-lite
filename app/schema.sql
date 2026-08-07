@@ -61,6 +61,20 @@ CREATE TABLE IF NOT EXISTS clients (
     allergies               TEXT,
     health_insurance        TEXT,
     notes                   TEXT,
+    -- Perímetros corporales en centímetros. Se guardan en la ficha (no en una tabla
+    -- de históricos) porque lo que se consulta a diario es la última medida; para
+    -- seguir la evolución en el tiempo haría falta una tabla aparte.
+    m_neck                  REAL,
+    m_shoulders             REAL,
+    m_chest                 REAL,
+    m_biceps_relaxed        REAL,
+    m_biceps_flexed         REAL,
+    m_forearm               REAL,
+    m_waist                 REAL,
+    m_hip                   REAL,
+    m_thigh_upper           REAL,
+    m_thigh_mid             REAL,
+    m_calf                  REAL,
     created_at              TEXT    NOT NULL,
     updated_at              TEXT    NOT NULL
 );
@@ -90,6 +104,14 @@ CREATE TABLE IF NOT EXISTS services (
 -- Inscripción de gimnasio (mensualidad).
 -- `quantity` es cuántas veces se compró la duración elegida: 3 días, 2 semanas,
 -- 6 meses. Se llamaba `months` cuando solo las mensualidades admitían cantidad.
+--
+-- Pausa: al pausar se guarda el día (`paused_at`) y los días que le quedaban
+-- (`paused_days`). Al reanudar, el vencimiento se recalcula desde ese día con los
+-- días guardados. No se toca `end_date` mientras está pausada, así que si alguien
+-- deshace la pausa el mismo día todo queda exactamente como estaba.
+--
+-- `is_migrated` marca las inscripciones cargadas desde «Migración de datos»: existían
+-- antes del programa y no representan un cobro, así que no cuentan como ingreso.
 CREATE TABLE IF NOT EXISTS memberships (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id      INTEGER NOT NULL REFERENCES clients(id),
@@ -102,6 +124,9 @@ CREATE TABLE IF NOT EXISTS memberships (
     services_total REAL    NOT NULL DEFAULT 0,
     total          REAL    NOT NULL,
     payment_method TEXT    NOT NULL DEFAULT 'EFECTIVO',
+    paused_at      TEXT,
+    paused_days    INTEGER,
+    is_migrated    INTEGER NOT NULL DEFAULT 0 CHECK (is_migrated IN (0, 1)),
     created_at     TEXT    NOT NULL
 );
 
@@ -166,6 +191,40 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at TEXT NOT NULL
 );
 
+-- Índices corporales que se calculan en la ficha del cliente (IMC, % de grasa…).
+-- La fórmula de cada uno vive en el código, no aquí: una fórmula escrita a mano en la
+-- base daría datos de salud erróneos sin que nada avisara. Lo configurable es cuáles
+-- se muestran y, sobre todo, cómo se interpretan (tabla `index_ranges`).
+CREATE TABLE IF NOT EXISTS body_indexes (
+    code       TEXT    PRIMARY KEY,
+    name       TEXT    NOT NULL,
+    enabled    INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+-- La matriz de interpretación: qué etiqueta le corresponde a cada valor.
+--
+-- `sex` y las edades permiten filas distintas para hombres y mujeres o por franja de
+-- edad; en NULL, la fila vale para cualquiera. Al clasificar gana la fila más
+-- específica, de modo que se puede tener un rango general y excepciones encima sin
+-- tener que repetir toda la tabla.
+--
+-- `min_value` en NULL significa «sin límite por abajo» y `max_value` en NULL, «sin
+-- límite por arriba». El intervalo es [min, max): así dos filas consecutivas encajan
+-- sin dejar huecos ni solaparse en el punto de corte.
+CREATE TABLE IF NOT EXISTS index_ranges (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    index_code TEXT    NOT NULL REFERENCES body_indexes(code) ON DELETE CASCADE,
+    sex        TEXT,
+    age_min    INTEGER,
+    age_max    INTEGER,
+    min_value  REAL,
+    max_value  REAL,
+    label      TEXT    NOT NULL,
+    severity   TEXT    NOT NULL DEFAULT 'ok' CHECK (severity IN ('ok', 'warn', 'bad')),
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
 -- Rostros registrados para el kiosco de acceso.
 --
 -- Se admiten VARIAS muestras por cliente (con gafas y sin ellas, otra luz, otro
@@ -192,7 +251,7 @@ CREATE TABLE IF NOT EXISTS access_logs (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id  INTEGER REFERENCES clients(id) ON DELETE SET NULL,
     allowed    INTEGER NOT NULL CHECK (allowed IN (0, 1)),
-    reason     TEXT    NOT NULL CHECK (reason IN ('ACTIVE', 'EXPIRED', 'NO_MEMBERSHIP', 'UNKNOWN')),
+    reason     TEXT    NOT NULL CHECK (reason IN ('ACTIVE', 'EXPIRED', 'PAUSED', 'NO_MEMBERSHIP', 'UNKNOWN')),
     -- Distancia euclídea con la muestra que ganó (0 = idéntico). Guardarla permite
     -- afinar el umbral con datos reales en vez de a ojo.
     distance   REAL,
@@ -210,6 +269,7 @@ CREATE INDEX IF NOT EXISTS idx_clients_created      ON clients(created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_created        ON audit_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_user           ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_client_faces_client  ON client_faces(client_id);
+CREATE INDEX IF NOT EXISTS idx_index_ranges_code    ON index_ranges(index_code, sort_order);
 CREATE INDEX IF NOT EXISTS idx_access_logs_created  ON access_logs(created_at);
 -- El antirrebote busca «último paso de este cliente», así que ordena por fecha
 -- dentro de un cliente concreto: el índice compuesto lo resuelve sin recorrer nada.

@@ -24,7 +24,11 @@
       <div class="icon">✅</div>
       <div><p class="tiny muted" style="margin:0">Inscripciones vigentes</p>
         <p class="value" style="margin:0">{{ kpis.active_memberships }}</p>
-        <p class="tiny muted" style="margin:0">+{{ kpis.new_clients_month }} cliente(s) este mes</p></div>
+        <p class="tiny muted" style="margin:0">
+          +{{ kpis.new_clients_month }} cliente(s) este mes{% if kpis.paused %} ·
+          <a href="{{ url_for('memberships.index', status='paused') }}">{{ kpis.paused }} en pausa</a>
+          {% endif %}
+        </p></div>
     </div>
     <div class="card kpi">
       <div class="icon">⏳</div>

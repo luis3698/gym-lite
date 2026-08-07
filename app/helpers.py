@@ -241,15 +241,37 @@ def duration_label(duration_type: str, quantity: int | None = None) -> str:
     return f"{base} x {count}" if count > 1 else base
 
 
-def membership_status(end_date_str: str | None) -> tuple[str, int | None]:
-    """Estado de vigencia -> ('none' | 'active' | 'expired', días restantes)."""
+def membership_status(
+    end_date_str: str | None, paused_at: str | None = None
+) -> tuple[str, int | None]:
+    """Estado -> ('none' | 'active' | 'paused' | 'expired', días restantes).
+
+    Una inscripción pausada no está vigente aunque su fecha de vencimiento aún no haya
+    llegado: el socio decidió congelarla y esos días se le devuelven al reanudar.
+    """
     if not end_date_str:
         return "none", None
     end = parse_date(end_date_str)
     if end is None:
         return "none", None
     days_left = (end - date.today()).days
+    if paused_at:
+        return "paused", days_left
     return ("active", days_left) if days_left > 0 else ("expired", days_left)
+
+
+def active_membership_sql(alias: str = "") -> str:
+    """Condición SQL de «inscripción vigente», para usarla en todas las consultas.
+
+    La regla vive aquí y en ningún otro sitio a propósito. Estaba repetida en catorce
+    consultas de cuatro archivos, y añadir la pausa habría significado acordarse de las
+    catorce: olvidar una sola deja entrar al gimnasio a alguien con la inscripción
+    congelada, y eso no lo detecta nadie hasta que pasa.
+
+    Deja un `?` para la fecha de hoy, que el llamante añade a sus parámetros.
+    """
+    prefix = f"{alias}." if alias else ""
+    return f"({prefix}end_date > ? AND {prefix}paused_at IS NULL)"
 
 
 # --- Formato para las plantillas --------------------------------------------

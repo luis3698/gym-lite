@@ -11,22 +11,23 @@ from flask import Blueprint, flash, g, redirect, render_template, request, url_f
 from ..config import (
     ACTIVITY_LEVELS,
     BLOOD_TYPES,
+    BODY_MEASUREMENTS,
     CLIENT_GOALS,
     MAX_AGE,
     MAX_HEIGHT_CM,
+    MAX_MEASUREMENT_CM,
     MAX_WEIGHT_KG,
 )
 from ..db import execute, insert, query_all, query_one, query_value, transaction
 from ..helpers import (
     InvalidNumber,
-    bmi_category,
-    body_mass_index,
     is_valid_email,
     now_str,
     optional_string,
     parse_age,
     parse_optional_decimal,
 )
+from ..indexes import compute_for_client
 from ..security import audit, roles_required, verify_password
 from ..uploads import UploadError, delete_image, resolve_captured_photo
 
@@ -66,7 +67,17 @@ def _read_form(form) -> dict:
     if activity_level and activity_level not in ACTIVITY_LEVELS:
         raise ValueError("Nivel de actividad inválido.")
 
+    # Perímetros: mismo tratamiento que altura y peso, todos opcionales.
+    medidas = {}
+    try:
+        for columna, etiqueta, _pista in BODY_MEASUREMENTS:
+            medidas[columna] = parse_optional_decimal(
+                form.get(columna), field=f"El perímetro «{etiqueta}»", maximum=MAX_MEASUREMENT_CM)
+    except InvalidNumber as exc:
+        raise ValueError(str(exc)) from None
+
     return {
+        **medidas,
         "first_name": first_name,
         "last_name": last_name,
         "document_id": document_id,
@@ -97,6 +108,7 @@ CLIENT_FIELDS = (
     "emergency_contact_name", "emergency_contact_phone",
     "blood_type", "height_cm", "weight_kg", "goal", "activity_level",
     "medical_conditions", "allergies", "health_insurance", "notes",
+    *(columna for columna, _etiqueta, _pista in BODY_MEASUREMENTS),
 )
 
 
@@ -199,14 +211,12 @@ def detail(client_id: int):
         "SELECT * FROM sales WHERE client_id = ? ORDER BY created_at DESC LIMIT 20",
         (client_id,),
     )
-    imc = body_mass_index(client["height_cm"], client["weight_kg"])
     return render_template(
         "clients/detail.html",
         client=client,
         memberships=memberships,
         sales=sales,
-        imc=imc,
-        imc_categoria=bmi_category(imc),
+        indices=compute_for_client(client),
     )
 
 

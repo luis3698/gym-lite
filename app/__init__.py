@@ -46,17 +46,26 @@ def create_app(*, database_path: str | None = None) -> Flask:
             for line in seed_database(app):
                 print(f"[GymManager Lite] {line}")
 
+        # La matriz de índices corporales se siembra siempre que falte, no solo en una
+        # base nueva: así una instalación que viene de una versión anterior arranca ya
+        # con los rangos cargados y utilizables.
+        from .indexes import ensure_defaults
+
+        ensure_defaults()
+
     app.before_request(load_logged_in_user)
     app.before_request(verify_csrf)
 
     from .views import (
-        access, audit, auth, clients, dashboard, income, memberships, products, sales,
-        tariffs, users,
+        access, audit, auth, body, clients, dashboard, income, memberships, migration,
+        products, sales, tariffs, users,
     )
 
     app.register_blueprint(auth.bp)
     app.register_blueprint(access.bp)
     app.register_blueprint(income.bp)
+    app.register_blueprint(body.bp)
+    app.register_blueprint(migration.bp)
     app.register_blueprint(dashboard.bp)
     app.register_blueprint(clients.bp)
     app.register_blueprint(memberships.bp)
@@ -92,6 +101,8 @@ def create_app(*, database_path: str | None = None) -> Flask:
             "BLOOD_TYPES": cfg.BLOOD_TYPES,
             "CLIENT_GOALS": cfg.CLIENT_GOALS,
             "ACTIVITY_LEVELS": cfg.ACTIVITY_LEVELS,
+            "BODY_MEASUREMENTS": cfg.BODY_MEASUREMENTS,
+            "MAX_MEASUREMENT_CM": cfg.MAX_MEASUREMENT_CM,
             "MAX_HEIGHT_CM": cfg.MAX_HEIGHT_CM,
             "MAX_WEIGHT_KG": cfg.MAX_WEIGHT_KG,
             "ACTION_LABELS": cfg.ACTION_LABELS,

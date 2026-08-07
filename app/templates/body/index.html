@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% from "_macros.html" import confirm_form %}
+{% block title %}Índices corporales — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Índices corporales</h1>
+    <p class="muted">
+      Qué se calcula en la ficha del cliente y cómo se interpreta cada valor.
+    </p>
+  </div>
+
+  <div class="notice">
+    <strong>Cómo funciona.</strong> La fórmula de cada índice es fija y está en el
+    programa: no se puede escribir a mano, porque un error de fórmula daría un dato de
+    salud equivocado sin que nada avisara. Lo que sí se ajusta aquí es la
+    <strong>interpretación</strong>: qué etiqueta le corresponde a cada valor, y si esa
+    etiqueta cambia según el sexo o la edad.
+    <br><br>
+    Cada rango <strong>incluye el mínimo y excluye el máximo</strong>, así que dos filas
+    seguidas (por ejemplo 18,5–25 y 25–30) encajan sin dejar huecos ni solaparse.
+    Dejar un límite vacío significa «sin tope por ese lado».
+    Cuando varias filas encajan gana la más específica, de modo que puede tener un rango
+    general y añadir excepciones por sexo o edad encima.
+  </div>
+
+  {% for item in indices %}
+    {% set d = item.definition %}
+    <div class="card" id="{{ item.row['code'] }}">
+      <div class="row between" style="align-items:flex-start;margin-bottom:.6rem">
+        <div style="flex:1;min-width:260px">
+          <h2 style="margin:0 0 .2rem">
+            {{ item.row['name'] }}
+            <span class="badge {{ 'ok' if item.row['enabled'] else 'none' }}"
+                  style="vertical-align:middle;margin-left:.3rem">
+              {{ 'Se muestra' if item.row['enabled'] else 'Oculto' }}
+            </span>
+          </h2>
+          {% if d %}
+            <p class="tiny muted" style="margin:0">{{ d.help_text }}</p>
+            <p class="tiny muted" style="margin:.3rem 0 0">
+              <strong>Necesita:</strong>
+              {% for _campo, etiqueta in d.requires %}{{ etiqueta }}{{ ', ' if not loop.last }}{% endfor %}
+              {%- if d.needs_sex %}, sexo{% endif %}.
+            </p>
+          {% endif %}
+        </div>
+        <div class="row tight">
+          <form method="post" action="{{ url_for('body.toggle', code=item.row['code']) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-secondary btn-sm">
+              {{ 'Ocultar de la ficha' if item.row['enabled'] else 'Mostrar en la ficha' }}
+            </button>
+          </form>
+          {{ confirm_form(
+              url_for('body.restore', code=item.row['code']),
+              'Se borrarán los rangos actuales de este índice y se cargarán los de fábrica. ¿Continuar?',
+              'Sí, restaurar',
+              '↺ Restaurar valores de fábrica',
+              extra_class='btn-secondary btn-sm'
+          ) }}
+        </div>
+      </div>
+
+      {% if item.ranges %}
+        <div class="table-wrap" style="max-height:none">
+          <table>
+            <thead><tr>
+              <th>Desde</th><th>Hasta</th><th>Sexo</th><th>Edad</th>
+              <th>Etiqueta</th><th>Nivel</th><th></th>
+            </tr></thead>
+            <tbody>
+              {% for r in item.ranges %}
+                <tr>
+                  <td class="nowrap">{{ r['min_value'] if r['min_value'] is not none else '—' }}</td>
+                  <td class="nowrap">{{ r['max_value'] if r['max_value'] is not none else '—' }}</td>
+                  <td class="muted">{{ r['sex'] or 'Cualquiera' }}</td>
+                  <td class="muted nowrap">
+                    {% if r['age_min'] is none and r['age_max'] is none %}Cualquiera
+                    {% else %}{{ r['age_min'] if r['age_min'] is not none else '0' }}–{{ r['age_max'] if r['age_max'] is not none else '120' }}{% endif %}
+                  </td>
+                  <td class="bold">{{ r['label'] }}</td>
+                  <td>
+                    <span class="badge {{ {'ok':'ok','warn':'draft','bad':'fail'}[r['severity']] }}">
+                      {{ severities[r['severity']] }}
+                    </span>
+                  </td>
+                  <td class="right">
+                    <form method="post" action="{{ url_for('body.delete_range', range_id=r['id']) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="linkbtn danger tiny">Eliminar</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="empty" style="padding:1rem 0">
+          Este índice no tiene rangos: se calculará el número pero no se le pondrá etiqueta.
+        </p>
+      {% endif %}
+
+      <details class="fieldset" style="margin-top:.9rem">
+        <summary><span class="bold">Añadir un rango</span></summary>
+        <form method="post" action="{{ url_for('body.add_range', code=item.row['code']) }}"
+              class="row" style="margin-top:.75rem">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="field" style="max-width:110px"><span>Desde</span>
+            <input type="number" name="min_value" step="0.01" placeholder="sin tope"></label>
+          <label class="field" style="max-width:110px"><span>Hasta</span>
+            <input type="number" name="max_value" step="0.01" placeholder="sin tope"></label>
+          <label class="field" style="max-width:150px"><span>Sexo</span>
+            <select name="sex">
+              <option value="">Cualquiera</option>
+              {% for s in SEX_OPTIONS %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+            </select></label>
+          <label class="field" style="max-width:100px"><span>Edad desde</span>
+            <input type="number" name="age_min" min="0" max="120" placeholder="—"></label>
+          <label class="field" style="max-width:100px"><span>Edad hasta</span>
+            <input type="number" name="age_max" min="0" max="120" placeholder="—"></label>
+          <label class="field" style="min-width:180px"><span>Etiqueta *</span>
+            <input type="text" name="label" required placeholder="Peso normal"></label>
+          <label class="field" style="max-width:170px"><span>Nivel</span>
+            <select name="severity">
+              {% for key, label in severities.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+            </select></label>
+          <button class="btn btn-primary">Añadir</button>
+        </form>
+      </details>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

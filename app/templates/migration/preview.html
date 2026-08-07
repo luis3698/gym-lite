@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Vista previa de la importación — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Vista previa de la importación</h1>
+    <p class="muted">
+      Todavía no se ha guardado nada. Revise el resultado antes de confirmar.
+    </p>
+  </div>
+
+  <div class="grid cols-3">
+    <div class="card kpi">
+      <div class="icon">✅</div>
+      <div><p class="tiny muted" style="margin:0">Listas para importar</p>
+        <p class="value" style="margin:0;color:var(--green-600)">{{ validas }}</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">⚠️</div>
+      <div><p class="tiny muted" style="margin:0">Con errores</p>
+        <p class="value" style="margin:0;color:{{ 'var(--red-600)' if con_error else 'var(--slate-400)' }}">{{ con_error }}</p>
+        <p class="tiny muted" style="margin:0">se omitirán</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">📄</div>
+      <div><p class="tiny muted" style="margin:0">Filas leídas</p>
+        <p class="value" style="margin:0">{{ previa | length }}</p></div>
+    </div>
+  </div>
+
+  {% if con_error %}
+    <div class="flash warning">
+      Hay {{ con_error }} fila(s) con errores. Puede confirmar igualmente —se importarán
+      solo las correctas— o corregir el archivo y volver a subirlo.
+    </div>
+  {% endif %}
+
+  <div class="card flush">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Fila</th><th>Cliente</th><th>Documento</th><th>Inscripción</th>
+          <th>Inicio</th><th>Vence</th><th>Estado</th>
+        </tr></thead>
+        <tbody>
+          {% for p in previa %}
+            <tr {% if p.errores %}style="background:var(--red-50)"{% endif %}>
+              <td class="muted">{{ p.linea }}</td>
+              <td class="bold">{{ p.nombre }}</td>
+              <td>{{ p.documento }}</td>
+              <td class="small">{{ p.duracion }}</td>
+              <td class="nowrap small">{{ p.inicio }}</td>
+              <td class="nowrap small">{{ p.vencimiento }}</td>
+              <td>
+                {% if p.errores %}
+                  <span class="badge fail">Se omite</span>
+                  <span class="tiny" style="color:var(--red-700)">{{ p.errores | join('; ') }}</span>
+                {% else %}
+                  <span class="badge ok">Se importará</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      {% if validas %}
+        <form method="post" action="{{ url_for('migration.confirm') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-primary">Confirmar e importar {{ validas }} socio(s)</button>
+        </form>
+      {% endif %}
+      <a class="btn btn-secondary" href="{{ url_for('migration.index') }}">Cancelar</a>
+      <span class="tiny muted">
+        Se guardan todas de una vez: si algo fallara a mitad, no quedaría ninguna a medias.
+      </span>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -56,6 +56,9 @@ BASE_QUERY = """
       FROM memberships m
       JOIN users   u ON u.id = m.sold_by_id
       JOIN clients c ON c.id = m.client_id
+      -- Las migradas quedan fuera: existían antes del programa y no representan un
+      -- cobro. Sumarlas mostraría un ingreso que nunca entró por caja.
+     WHERE m.is_migrated = 0
 
     UNION ALL
 

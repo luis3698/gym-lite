@@ -37,14 +37,7 @@
                        or client['goal'] or client['activity_level'] or client['medical_conditions']
                        or client['allergies'] or client['health_insurance'] or client['notes'] %}
   <div class="card">
-    <div class="row between" style="margin-bottom:.6rem">
-      <h2 style="margin:0">Ficha deportiva y de salud</h2>
-      {% if imc %}
-        <span class="badge {{ 'ok' if imc_categoria == 'Peso normal' else 'draft' }}">
-          IMC {{ imc }} · {{ imc_categoria }}
-        </span>
-      {% endif %}
-    </div>
+    <h2 style="margin:0 0 .6rem">Ficha deportiva y de salud</h2>
 
     {% if tiene_ficha %}
       <div class="deflist">
@@ -79,6 +72,25 @@
           <p style="margin:0">{{ client['notes'] }}</p>
         </div>
       {% endif %}
+
+      {# --- Perímetros --- #}
+      {% set medidas = BODY_MEASUREMENTS | selectattr('0') | list %}
+      {% set con_valor = [] %}
+      {% for columna, etiqueta, _pista in BODY_MEASUREMENTS %}
+        {% if client[columna] %}{% set _ = con_valor.append((etiqueta, client[columna])) %}{% endif %}
+      {% endfor %}
+
+      {% if con_valor %}
+        <p class="small bold" style="margin:1.2rem 0 .5rem">Perímetros corporales</p>
+        <div class="grid auto">
+          {% for etiqueta, valor in con_valor %}
+            <div class="measure-tile">
+              <p class="tiny muted" style="margin:0">{{ etiqueta }}</p>
+              <p class="bold" style="margin:.1rem 0 0;font-size:1.05rem">{{ valor | num }} <span class="tiny muted">cm</span></p>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
     {% else %}
       <p class="empty" style="padding:1rem 0">
         Sin datos deportivos.
@@ -87,6 +99,46 @@
       </p>
     {% endif %}
   </div>
+
+  {# --- Índices corporales -------------------------------------------------- #}
+  {% if indices %}
+    <div class="card">
+      <div class="row between" style="margin-bottom:.6rem">
+        <h2 style="margin:0">Índices corporales</h2>
+        {% if current_user['role'] == 'ADMIN' %}
+          <a class="tiny" href="{{ url_for('body.index') }}">Configurar los rangos</a>
+        {% endif %}
+      </div>
+
+      <div class="grid auto">
+        {% for i in indices %}
+          <div class="index-tile {{ i.severity }}">
+            <p class="tiny muted" style="margin:0">{{ i.name }}</p>
+            {% if i.value is not none %}
+              <p class="index-value">{{ i.value | num }}{{ i.unit }}</p>
+              {% if i.label %}
+                <span class="badge {{ {'ok':'ok','warn':'draft','bad':'fail'}.get(i.severity, 'none') }}">
+                  {{ i.label }}
+                </span>
+              {% else %}
+                <span class="tiny muted">Sin rango configurado para este valor</span>
+              {% endif %}
+            {% else %}
+              <p class="index-value muted">—</p>
+              <span class="tiny muted">
+                Falta: {{ i.missing | join(', ') }}
+              </span>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+
+      <p class="tiny muted" style="margin:.9rem 0 0">
+        Son estimaciones orientativas a partir de las medidas de la ficha, útiles para
+        seguir la evolución del socio. No sustituyen una valoración médica.
+      </p>
+    </div>
+  {% endif %}
 
   <div class="card flush">
     <div style="padding:1.15rem 1.15rem .5rem"><h2 style="margin:0">Inscripciones</h2></div>

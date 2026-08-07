@@ -31,7 +31,7 @@ from pathlib import Path
 from tkinter import filedialog, font as tkfont, messagebox, ttk
 
 APP_NAME = "GymManager Lite"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.2"
 PUBLISHER = "GymManager"
 EXE_NAME = "GymManager Lite.exe"
 UNINSTALLER_NAME = "Desinstalar GymManager Lite.exe"

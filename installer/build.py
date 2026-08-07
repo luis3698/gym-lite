@@ -29,7 +29,7 @@ DIST_DIR = ROOT / "dist"
 VENV_DIR = ROOT / ".venv"
 
 APP_NAME = "GymManager Lite"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.2"
 PUBLISHER = "GymManager"
 SETUP_NAME = "GymManagerLite-Setup"
 UNINSTALLER_NAME = "Desinstalar GymManager Lite"

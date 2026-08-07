@@ -137,7 +137,17 @@ def migrate(conn: sqlite3.Connection) -> list[str]:
         conn.execute("ALTER TABLE memberships RENAME COLUMN months TO quantity")
         applied.append("memberships.months -> quantity")
 
-    # Datos opcionales de gimnasio en la ficha del cliente.
+    # Pausa de inscripciones y marca de las cargadas por migración.
+    for column, ddl in (
+        ("paused_at", "paused_at TEXT"),
+        ("paused_days", "paused_days INTEGER"),
+        ("is_migrated", "is_migrated INTEGER NOT NULL DEFAULT 0"),
+    ):
+        if column not in membership_cols:
+            conn.execute(f"ALTER TABLE memberships ADD COLUMN {ddl}")
+            applied.append(f"memberships.{column}")
+
+    # Datos opcionales de gimnasio en la ficha del cliente, incluidos los perímetros.
     client_cols = _columns(conn, "clients")
     for column, ddl in (
         ("blood_type", "blood_type TEXT"),
@@ -149,10 +159,48 @@ def migrate(conn: sqlite3.Connection) -> list[str]:
         ("allergies", "allergies TEXT"),
         ("health_insurance", "health_insurance TEXT"),
         ("notes", "notes TEXT"),
+        ("m_neck", "m_neck REAL"),
+        ("m_shoulders", "m_shoulders REAL"),
+        ("m_chest", "m_chest REAL"),
+        ("m_biceps_relaxed", "m_biceps_relaxed REAL"),
+        ("m_biceps_flexed", "m_biceps_flexed REAL"),
+        ("m_forearm", "m_forearm REAL"),
+        ("m_waist", "m_waist REAL"),
+        ("m_hip", "m_hip REAL"),
+        ("m_thigh_upper", "m_thigh_upper REAL"),
+        ("m_thigh_mid", "m_thigh_mid REAL"),
+        ("m_calf", "m_calf REAL"),
     ):
         if column not in client_cols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {ddl}")
             applied.append(f"clients.{column}")
+
+    # El CHECK de access_logs.reason enumera los motivos válidos, y en SQLite un CHECK
+    # no se puede modificar con ALTER: hay que rehacer la tabla. Sin esto, en una base
+    # ya instalada el primer socio en pausa que se pusiera delante de la cámara haría
+    # fallar la escritura del registro.
+    ddl = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'access_logs'"
+    ).fetchone()
+    if ddl and ddl[0] and "'PAUSED'" not in ddl[0]:
+        conn.executescript("""
+            CREATE TABLE access_logs_nuevo (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id  INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+                allowed    INTEGER NOT NULL CHECK (allowed IN (0, 1)),
+                reason     TEXT    NOT NULL CHECK (reason IN ('ACTIVE', 'EXPIRED', 'PAUSED',
+                                                             'NO_MEMBERSHIP', 'UNKNOWN')),
+                distance   REAL,
+                created_at TEXT    NOT NULL
+            );
+            INSERT INTO access_logs_nuevo (id, client_id, allowed, reason, distance, created_at)
+                 SELECT id, client_id, allowed, reason, distance, created_at FROM access_logs;
+            DROP TABLE access_logs;
+            ALTER TABLE access_logs_nuevo RENAME TO access_logs;
+            CREATE INDEX IF NOT EXISTS idx_access_logs_created ON access_logs(created_at);
+            CREATE INDEX IF NOT EXISTS idx_access_logs_client  ON access_logs(client_id, created_at);
+        """)
+        applied.append("access_logs.reason admite 'PAUSED'")
 
     conn.commit()
     return applied

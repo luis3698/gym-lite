@@ -107,6 +107,23 @@
                   placeholder="Cualquier cosa que convenga recordar de este cliente.">{{ client['notes'] or '' }}</textarea>
       </label>
 
+      {# --- Perímetros corporales --- #}
+      <p class="small bold" style="margin:1.2rem 0 .1rem">Perímetros corporales</p>
+      <p class="tiny muted" style="margin:0 0 .6rem">
+        En centímetros. Cuello, cintura y cadera son además los que usan los índices
+        corporales para estimar el porcentaje de grasa.
+      </p>
+      <div class="grid cols-4">
+        {% for columna, etiqueta, pista in BODY_MEASUREMENTS %}
+          <label class="field">
+            <span>{{ etiqueta }} <span class="muted">(cm)</span></span>
+            <input type="number" name="{{ columna }}" step="0.1" min="1" max="{{ MAX_MEASUREMENT_CM }}"
+                   value="{{ client[columna] | num if client[columna] else '' }}">
+            <span class="tiny muted">{{ pista }}</span>
+          </label>
+        {% endfor %}
+      </div>
+
       <p class="tiny muted" style="margin:.75rem 0 0">
         Estos datos ayudan a atender una urgencia y a orientar el entrenamiento. Ninguno es
         obligatorio y se pueden rellenar después desde «Editar cliente».
