@@ -113,8 +113,53 @@ class transaction:
 # --- Inicialización ----------------------------------------------------------
 
 
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def migrate(conn: sqlite3.Connection) -> list[str]:
+    """Ajusta bases creadas con una versión anterior del esquema.
+
+    `CREATE TABLE IF NOT EXISTS` cubre las tablas nuevas, pero no las columnas nuevas
+    de una tabla que ya existe ni los cambios de nombre. Cada paso comprueba primero
+    si hace falta, así que se puede ejecutar en cada arranque sin efectos.
+
+    No se usa una tabla de versiones a propósito: comprobar el estado real de las
+    columnas funciona igual de bien aquí y no se rompe si alguien restaura una copia
+    de seguridad antigua encima.
+    """
+    applied: list[str] = []
+
+    # `months` solo valía para las mensualidades. Ahora cualquier duración admite
+    # cantidad (3 días, 2 semanas…), así que el nombre pasa a ser `quantity`.
+    membership_cols = _columns(conn, "memberships")
+    if "months" in membership_cols and "quantity" not in membership_cols:
+        conn.execute("ALTER TABLE memberships RENAME COLUMN months TO quantity")
+        applied.append("memberships.months -> quantity")
+
+    # Datos opcionales de gimnasio en la ficha del cliente.
+    client_cols = _columns(conn, "clients")
+    for column, ddl in (
+        ("blood_type", "blood_type TEXT"),
+        ("height_cm", "height_cm REAL"),
+        ("weight_kg", "weight_kg REAL"),
+        ("goal", "goal TEXT"),
+        ("activity_level", "activity_level TEXT"),
+        ("medical_conditions", "medical_conditions TEXT"),
+        ("allergies", "allergies TEXT"),
+        ("health_insurance", "health_insurance TEXT"),
+        ("notes", "notes TEXT"),
+    ):
+        if column not in client_cols:
+            conn.execute(f"ALTER TABLE clients ADD COLUMN {ddl}")
+            applied.append(f"clients.{column}")
+
+    conn.commit()
+    return applied
+
+
 def init_db(app: Flask) -> bool:
-    """Crea el esquema si falta. Devuelve True si la base estaba vacía."""
+    """Crea el esquema si falta y migra el existente. True si la base estaba vacía."""
     db_path = Path(app.config["DATABASE"])
     db_path.parent.mkdir(parents=True, exist_ok=True)
     is_new = not db_path.exists() or db_path.stat().st_size == 0
@@ -123,6 +168,8 @@ def init_db(app: Flask) -> bool:
     try:
         conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
         conn.commit()
+        for change in migrate(conn):
+            print(f"[GymManager Lite] Base de datos actualizada: {change}")
     finally:
         conn.close()
     return is_new

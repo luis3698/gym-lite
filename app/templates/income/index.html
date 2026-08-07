@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Ventas e ingresos — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Registro de ventas e ingresos</h1>
+    <p class="muted">
+      Todo el dinero que entra al gimnasio: inscripciones y venta de productos, en una
+      sola lista.
+    </p>
+  </div>
+
+  {# --- Filtros ------------------------------------------------------------- #}
+  <form class="card" method="get">
+    <div class="row">
+      <label class="field"><span>Tipo</span>
+        <select name="kind" class="w-md">
+          {% for key, label in kinds.items() %}
+            <option value="{{ key }}" {{ 'selected' if filters.kind == key }}>{{ label }}</option>
+          {% endfor %}
+        </select></label>
+
+      <label class="field"><span>Método de pago</span>
+        <select name="payment" class="w-md">
+          <option value="">Todos</option>
+          {% for key, label in PAYMENT_METHODS.items() %}
+            <option value="{{ key }}" {{ 'selected' if filters.payment == key }}>{{ label }}</option>
+          {% endfor %}
+        </select></label>
+
+      <label class="field"><span>Atendido por</span>
+        <select name="staff_id" class="w-md">
+          <option value="">Todo el personal</option>
+          {% for u in staff %}
+            <option value="{{ u['id'] }}" {{ 'selected' if filters.staff_id == u['id'] | string }}>
+              {{ u['first_name'] }} {{ u['last_name'] }} ({{ u['username'] }})
+            </option>
+          {% endfor %}
+        </select></label>
+
+      <label class="field"><span>Cliente</span>
+        <input type="search" name="q" value="{{ filters.q }}" placeholder="Nombre o documento" class="w-md"></label>
+
+      <label class="field"><span>Desde</span>
+        <input type="date" name="from" value="{{ filters['from'] }}"></label>
+      <label class="field"><span>Hasta</span>
+        <input type="date" name="to" value="{{ filters.to }}"></label>
+
+      <button class="btn btn-primary">Aplicar filtros</button>
+      <a class="btn btn-secondary" href="{{ url_for('income.index') }}">Limpiar</a>
+      <span class="spacer"></span>
+      <a class="btn btn-secondary" href="{{ url_for('income.export_csv', **request.args) }}">⬇️ Exportar CSV</a>
+    </div>
+  </form>
+
+  {# --- Totales ------------------------------------------------------------- #}
+  <div class="grid cols-4">
+    <div class="card kpi">
+      <div class="icon">💰</div>
+      <div><p class="tiny muted" style="margin:0">Total del periodo</p>
+        <p class="value" style="margin:0;color:var(--green-600)">{{ totals.get('total', 0) | money }}</p>
+        <p class="tiny muted" style="margin:0">{{ totals.get('movimientos', 0) }} movimiento(s)</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">📅</div>
+      <div><p class="tiny muted" style="margin:0">Inscripciones</p>
+        <p class="value" style="margin:0">{{ totals.get('memberships', 0) | money }}</p>
+        <p class="tiny muted" style="margin:0">{{ totals.get('n_memberships', 0) }} inscripción(es)</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">🛒</div>
+      <div><p class="tiny muted" style="margin:0">Venta de productos</p>
+        <p class="value" style="margin:0">{{ totals.get('sales', 0) | money }}</p>
+        <p class="tiny muted" style="margin:0">{{ totals.get('n_sales', 0) }} venta(s)</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">📊</div>
+      <div><p class="tiny muted" style="margin:0">Promedio por movimiento</p>
+        <p class="value" style="margin:0">{{ totals.get('promedio', 0) | money }}</p>
+        <p class="tiny muted" style="margin:0">sobre lo filtrado</p></div>
+    </div>
+  </div>
+
+  {# --- Reparto por método de pago ------------------------------------------ #}
+  {% if by_payment %}
+    <div class="card">
+      <h2 style="margin:0 0 .6rem">Por método de pago</h2>
+      <div class="grid auto">
+        {% for p in by_payment %}
+          <div class="pay-tile">
+            <p class="tiny muted" style="margin:0">{{ PAYMENT_METHODS.get(p['payment_method'], p['payment_method']) }}</p>
+            <p class="bold" style="margin:.15rem 0 0;font-size:1.1rem">{{ p['total'] | money }}</p>
+            <p class="tiny muted" style="margin:0">{{ p['movimientos'] }} movimiento(s)</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {# --- Detalle ------------------------------------------------------------- #}
+  <div class="card flush">
+    {% if rows %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Fecha y hora</th><th>Tipo</th><th>Cliente</th><th>Detalle</th>
+            <th>Pago</th><th>Atendido por</th><th class="right">Total</th><th></th>
+          </tr></thead>
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                <td class="nowrap muted">{{ r['created_at'] | fechahora_seg }}</td>
+                <td>
+                  <span class="badge {{ 'active' if r['kind'] == 'MEMBERSHIP' else 'draft' }}">
+                    {{ kind_labels.get(r['kind'], r['kind']) }}
+                  </span>
+                </td>
+                <td>
+                  <span class="bold">{{ r['person_name'] or '—' }}</span><br>
+                  <span class="tiny muted">{{ r['person_document'] or '—' }}</span>
+                </td>
+                <td class="small">{{ describe(r) }}</td>
+                <td class="small">{{ PAYMENT_METHODS.get(r['payment_method'], r['payment_method']) }}</td>
+                <td class="small muted">{{ r['staff_name'] }}</td>
+                <td class="right bold">{{ r['total'] | money }}</td>
+                <td class="right nowrap">
+                  {% if r['kind'] == 'MEMBERSHIP' %}
+                    <a class="small" href="{{ url_for('memberships.receipt', membership_id=r['id']) }}">Recibo</a>
+                  {% else %}
+                    <a class="small" href="{{ url_for('sales.receipt', sale_id=r['id']) }}">Recibo</a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if rows | length >= max_rows %}
+        <p class="tiny muted" style="padding:.75rem 1rem;margin:0">
+          Se muestran los {{ max_rows }} movimientos más recientes que cumplen el filtro;
+          los totales de arriba sí incluyen todos. Acote las fechas para ver los anteriores.
+        </p>
+      {% endif %}
+    {% else %}
+      <p class="empty">No hay movimientos para los filtros seleccionados.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

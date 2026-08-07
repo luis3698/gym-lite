@@ -61,6 +61,41 @@ LOCK_MINUTES = 5
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB por imagen
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
+# --- Reconocimiento facial (kiosco de acceso) --------------------------------
+# El navegador convierte cada rostro en 128 números («descriptor») y los manda aquí;
+# el emparejamiento se hace en el servidor, así que la galería de rostros nunca sale
+# de la máquina.
+
+FACE_DESCRIPTOR_LENGTH = 128
+
+# Distancia euclídea máxima para dar dos rostros por la misma persona.
+# face-api recomienda 0,6 como punto de partida. Aquí se aprieta a 0,50 porque el
+# coste de los dos errores no es simétrico: dejar entrar a quien no toca es peor que
+# pedirle a un socio que se acerque otra vez a la cámara.
+FACE_MATCH_THRESHOLD = 0.50
+
+# Franja de duda: por encima del umbral pero cerca. No se identifica a nadie, se pide
+# acercarse. Evita el caso feo de enseñar los datos de otra persona parecida.
+FACE_UNCERTAIN_THRESHOLD = 0.58
+
+# Muestras por cliente. Varias tomas (con gafas, sin ellas, otra luz) suben mucho el
+# acierto; pasado ese punto solo engordan la comparación.
+MAX_FACES_PER_CLIENT = 5
+
+# Antirrebote: quien acaba de pasar no vuelve a registrarse durante este rato aunque
+# siga delante de la cámara. Se le sigue mostrando su ficha, pero como «ya registrado».
+# Este es el valor de fábrica; el administrador lo cambia desde «Control de acceso».
+FACE_COOLDOWN_SECONDS = 90
+
+# Límites del antirrebote configurable. Por debajo de 5 s la cámara registraría varias
+# entradas del mismo paso; por encima de 12 h no dejaría entrar dos veces en un día.
+MIN_FACE_COOLDOWN_SECONDS = 5
+MAX_FACE_COOLDOWN_SECONDS = 43_200
+
+# Nadie razonable entra más veces que esto en un día; sirve de tope defensivo por si
+# la cámara se queda mirando una foto pegada en la pared.
+MAX_ACCESS_LOGS_PER_DAY = 50
+
 # --- Vocabulario del dominio -------------------------------------------------
 
 ROLES = {
@@ -88,9 +123,27 @@ VALID_PAYMENT_METHODS = tuple(PAYMENT_METHODS)
 SEX_OPTIONS = ("Masculino", "Femenino", "Otro")
 BLOOD_TYPES = ("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
 
+# --- Ficha deportiva del cliente ---------------------------------------------
+# Todo esto es opcional: se rellena con el tiempo, no en el mostrador el primer día.
+
+CLIENT_GOALS = (
+    "Bajar de peso",
+    "Ganar masa muscular",
+    "Tonificar",
+    "Mantenerse en forma",
+    "Rendimiento deportivo",
+    "Rehabilitación",
+)
+ACTIVITY_LEVELS = ("Principiante", "Intermedio", "Avanzado")
+
+# Topes para que un dedazo (1.75 en vez de 175) no pase inadvertido.
+MAX_HEIGHT_CM = 260
+MAX_WEIGHT_KG = 400
+
 # Topes defensivos: evitan que un formulario manipulado genere fechas de vencimiento
 # absurdas o cantidades imposibles de cobrar.
-MAX_MEMBERSHIP_MONTHS = 60
+# Cuántas veces se puede comprar de golpe la misma duración (60 días, 60 meses…).
+MAX_MEMBERSHIP_QUANTITY = 60
 MAX_ITEM_QUANTITY = 10_000
 MAX_STOCK = 1_000_000
 MAX_AGE = 120
@@ -124,6 +177,19 @@ ACTION_LABELS = {
     "PRODUCT_UPDATED": "Producto editado",
     "PRODUCT_DELETED": "Producto eliminado",
     "SALE_CREATED": "Venta registrada",
+    "FACE_ENROLLED": "Rostro registrado para el acceso",
+    "FACE_REMOVED": "Rostro eliminado del acceso",
+    "FACE_TOGGLED": "Reconocimiento facial activado o desactivado",
+    "FACE_COOLDOWN_CHANGED": "Antirrebote del kiosco modificado",
+}
+
+# Motivos del kiosco: el código que se guarda en access_logs.reason y el texto que se
+# muestra en pantalla.
+ACCESS_REASONS = {
+    "ACTIVE": "Inscripción vigente",
+    "EXPIRED": "Inscripción vencida",
+    "NO_MEMBERSHIP": "Sin inscripción registrada",
+    "UNKNOWN": "Rostro no reconocido",
 }
 
 

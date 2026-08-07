@@ -33,7 +33,8 @@ Puede elegir otra, incluida una unidad externa.
 ### Paso 3 — Entrar
 
 Doble clic en **«GymManager Lite»** del escritorio. Se abre una ventana de control
-pequeña y, a continuación, el navegador.
+pequeña y, a continuación, el navegador con **dos pestañas**: el programa y el
+**kiosco de acceso** (la pantalla con la cámara para la entrada del gimnasio).
 
 | Campo | Valor |
 |---|---|
@@ -44,6 +45,11 @@ pequeña y, a continuación, el navegador.
 
 ### Paso 4 — Configurar las tarifas
 
+> Las tarifas se cobran por **cantidad**: si fija «1 día» en $10.000, un cliente que
+> quiera pagar 5 días paga $50.000. Lo mismo con semanas y quincenas. Las mensualidades
+> mantienen su descuento: el primer mes a la tarifa mensual y los siguientes a la de
+> «mes adicional». El total se ve en pantalla mientras se arma la inscripción.
+
 La instalación deja la base de datos **limpia**: solo existe el usuario administrador.
 Antes de registrar la primera inscripción, entre en **Crear tarifas** y fije los
 precios por duración y el valor del mes adicional. Sin tarifas, la aplicación avisa de
@@ -51,6 +57,62 @@ que faltan al intentar registrar una mensualidad.
 
 Los productos, los servicios complementarios y los clientes se dan de alta desde sus
 respectivos módulos.
+
+---
+
+## Reconocimiento facial (kiosco de acceso)
+
+Viene **activado** de fábrica. Se enciende y se apaga desde
+**Administración → Control de acceso**, y ahí mismo se ve el histórico de entradas.
+
+### Cómo se pone en marcha
+
+1. **Registrar el rostro del cliente.** Se hace durante la inscripción: entre en
+   **Inscripción de gym → el cliente → «Registrar rostro»**. Se toman las **5 muestras
+   seguidas**, sin pulsar nada entre una y otra: la pantalla va pidiendo que mire de
+   frente, gire un poco a un lado, al otro, levante la barbilla. Cada muestra se acepta
+   sola cuando el encuadre es bueno (una sola persona, de frente, lo bastante cerca).
+   Varias tomas con ángulos y luces distintas es lo que hace que la puerta acierte.
+2. **Dejar abierta la pestaña del kiosco** en el PC de recepción, con la cámara apuntando
+   a la puerta.
+
+### Qué hace en la entrada
+
+| Situación | Qué muestra |
+|---|---|
+| Socio con inscripción vigente | **ACCESO PERMITIDO** en verde, con su foto, documento, vencimiento y teléfono |
+| Socio con inscripción vencida | **ACCESO DENEGADO**, indicando desde cuándo está vencida |
+| Cliente sin ninguna inscripción | **ACCESO DENEGADO**, «sin inscripción registrada» |
+| Rostro que no está registrado | «Rostro no reconocido. Diríjase a recepción» |
+| Parecido dudoso | «Acérquese un poco más» — nunca adivina a quién enseñar |
+| Varias personas a la vez | «Pasen de uno en uno», salvo que una esté claramente al frente |
+| Rostro demasiado lejos | «Acérquese a la cámara» |
+
+Quien se queda parado delante de la cámara **no genera entradas repetidas**: se le
+sigue mostrando su ficha marcada como «ya se registró su entrada hace X». El tiempo que
+dura ese bloqueo (el **antirrebote**) se cambia en **Control de acceso**: 90 segundos de
+fábrica, 4 horas si quiere contar como mucho dos entradas al día, 12 horas para una sola.
+
+> Mientras trabaja en el programa no hace falta cambiar de pestaña para saber quién
+> acaba de entrar: cuando alguien pasa por la cámara aparece un **aviso abajo a la
+> derecha** con su nombre y si se le permitió el paso. Se desvanece solo a los **10
+> segundos** —el resto del tiempo no ocupa nada de la pantalla— y se puede cerrar antes
+> con la «×». Solo avisa de lo que acaba de ocurrir: al abrir una pantalla no salta el
+> aviso de alguien que entró hace rato.
+>
+> Si entra **gente en fila**, no se pierde ninguno: se anuncian uno tras otro, cada uno
+> unos segundos, con un contador de cuántos quedan por mostrar («+3»). El último de la
+> tanda se queda los 10 segundos completos.
+
+> **Privacidad.** No se guarda ninguna imagen de la cámara. De cada rostro se almacenan
+> 128 números que lo describen, con los que **no se puede reconstruir la cara**. La
+> comparación ocurre dentro de este equipo: nada sale a internet.
+
+### Si no lo quiere usar
+
+Entre en **Control de acceso** y pulse **Desactivar**. La pestaña del kiosco deja de
+abrirse sola y de pedir la cámara, y la inscripción deja de pedir el rostro. Los rostros
+ya registrados se conservan por si vuelve a activarlo.
 
 ---
 
@@ -130,11 +192,14 @@ borrarlos, que pide una confirmación adicional.
 |---|---|
 | SmartScreen bloquea el instalador | «Más información» → «Ejecutar de todas formas». El archivo no está firmado digitalmente. |
 | «No se pudo escribir …» durante la instalación | El programa estaba abierto. Ciérrelo desde su ventana de control y reinstale. |
-| «No hay espacio suficiente en la unidad» | Elija otra carpeta de destino o libere espacio. Hacen falta unos 45 MB. |
+| «No hay espacio suficiente en la unidad» | Elija otra carpeta de destino o libere espacio. Hacen falta unos 55 MB. |
 | El navegador dice que no puede conectarse | La ventana de control está cerrada. Abra el programa con el acceso directo. |
 | No aparece el acceso directo en el escritorio | Vuelva a ejecutar el instalador y marque la casilla correspondiente, o cree el acceso a mano al `.exe`. |
 | «No hay tarifa configurada para esta duración» | Es lo esperado en una instalación nueva: fije las tarifas en «Crear tarifas». |
 | La cámara no funciona al tomar la foto | Debe permitir el acceso a la cámara en el navegador. Solo funciona en `localhost` o con HTTPS: es una restricción del navegador. |
+| El kiosco dice «Otro programa está usando la cámara» | Ciérrelo (videollamadas, o el propio kiosco abierto en dos pestañas) y recargue. |
+| El kiosco no reconoce a un socio que sí está registrado | Añada otra muestra de su rostro desde la inscripción, con la luz y las gafas del día a día. Compruebe que la cámara no esté a contraluz. |
+| El kiosco no se abre solo al arrancar | El reconocimiento facial está desactivado. Actívelo en **Control de acceso**. |
 | Olvidé la contraseña de administrador | No hay recuperación por correo. Cierre el programa, borre `data\gym.db` y vuelva a abrirlo: se recrea con `Admin` / `Admin.123`, pero **se pierden todos los datos**. |
 
 Si algo falla al arrancar, el detalle técnico queda en `data\error.log`.
@@ -145,8 +210,9 @@ Si algo falla al arrancar, el detalle técnico queda en `data\error.log`.
 
 - Windows 10 u 11 (64 bits).
 - Navegador moderno: Chrome, Edge o Firefox.
-- Cámara web, únicamente si quiere tomar la foto de los clientes desde el programa.
-- Espacio en disco: unos 45 MB, más lo que ocupen las fotos.
+- Cámara web, si quiere tomar la foto de los clientes desde el programa o usar el
+  reconocimiento facial en la entrada.
+- Espacio en disco: unos 55 MB, más lo que ocupen las fotos.
 
 No requiere Python, ni conexión a internet, ni permisos de administrador.
 

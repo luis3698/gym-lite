@@ -29,7 +29,7 @@
             {{ 'Inscripción vencida' if status == 'expired' else 'Inscripción vigente' }}
           </h2>
           <p class="small" style="margin:.35rem 0 0;color:{{ 'var(--red-700)' if status == 'expired' else 'var(--blue-700)' }}">
-            {{ DURATIONS[current['duration_type']] }}{% if current['duration_type'] == 'MONTH' and current['months'] and current['months'] > 1 %} x {{ current['months'] }}{% endif %}
+            {{ duracion(current['duration_type'], current['quantity']) }}
             — {{ 'venció' if status == 'expired' else 'vence' }} {{ current['end_date'] | fecha }}
             {% if status == 'active' %}({{ days_left }} día(s) restante(s)){% endif %}
           </p>
@@ -51,8 +51,25 @@
     </div>
   {% endif %}
 
-  <form method="post" class="grid cols-2" style="align-items:start">
+  <form method="post" class="grid cols-2" style="align-items:start" data-membership-form>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {# Todo lo que el resumen necesita para calcular, en un solo sitio. Los precios se
+       vuelven a leer de la base al guardar: esto es solo para mostrar. #}
+    <script type="application/json" data-tariffs>
+      {
+        "inscription": {{ tariffs.inscription | tojson }},
+        "extra_month": {{ tariffs.extra_month | tojson }},
+        "labels": {{ DURATIONS | tojson }},
+        "services": [
+          {%- for s in tariffs.services -%}
+            {"id": {{ s['id'] }}, "name": {{ s['name'] | tojson }}, "price": {{ s['price'] }}}
+            {{- "," if not loop.last -}}
+          {%- endfor -%}
+        ],
+        "max_quantity": {{ max_quantity }}
+      }
+    </script>
 
     <div class="card stack">
       <h2>{{ 'Renovar inscripción' if current else 'Nueva inscripción' }}</h2>
@@ -73,14 +90,16 @@
       </div>
 
       <label class="field">
-        <span>Número de meses <span class="muted">(solo si elige «Por mes»)</span></span>
-        <input type="number" name="months" min="1" max="{{ max_months }}"
-               value="{{ form.get('months') or 1 }}" class="w-sm">
+        <span>Cantidad <span class="muted" data-quantity-unit>(veces la duración elegida)</span></span>
+        <input type="number" name="quantity" min="1" max="{{ max_quantity }}"
+               value="{{ form.get('quantity') or 1 }}" class="w-sm" data-quantity>
+        <span class="tiny muted" data-quantity-hint></span>
       </label>
 
       <label class="field">
         <span>Fecha de inicio *</span>
-        <input type="date" name="start_date" value="{{ form.get('start_date') or default_start }}" required class="w-md">
+        <input type="date" name="start_date" value="{{ form.get('start_date') or default_start }}"
+               required class="w-md" data-start-date>
       </label>
 
       <label class="field">
@@ -111,23 +130,144 @@
       </div>
     </div>
 
-    <div class="card stack">
-      <h2>Tarifas vigentes</h2>
-      <table>
-        <tbody>
-          {% for key, label in DURATIONS.items() %}
-            <tr><td>{{ label }}</td><td class="right bold">{{ tariffs.inscription.get(key, 0) | money }}</td></tr>
-          {% endfor %}
-          <tr><td class="muted">Cada mes adicional</td><td class="right">{{ tariffs.extra_month | money }}</td></tr>
-        </tbody>
-      </table>
-      <p class="tiny muted" style="margin:0">
-        El total exacto se calcula al registrar la inscripción, con las tarifas guardadas en
-        ese momento, y queda impreso en el recibo.
-      </p>
+    {# --- Resumen en vivo --- #}
+    <div class="card stack" data-summary>
+      <h2 style="margin:0">Resumen de la inscripción</h2>
+
+      <div class="summary-lines">
+        <div class="summary-line">
+          <span>Duración</span>
+          <span class="bold" data-sum-duration>—</span>
+        </div>
+        <div class="summary-line">
+          <span>Vigencia</span>
+          <span class="bold" data-sum-period>—</span>
+        </div>
+        <div class="summary-line">
+          <span data-sum-base-label>Inscripción</span>
+          <span class="bold" data-sum-base>—</span>
+        </div>
+        <div data-sum-services></div>
+      </div>
+
+      <div class="summary-total">
+        <span>Total a cobrar</span>
+        <span data-sum-total>—</span>
+      </div>
+
+      <p class="tiny muted" style="margin:0" data-sum-warning hidden></p>
+
       <button class="btn btn-primary btn-block">Registrar y generar recibo</button>
+
+      <details class="tariff-details">
+        <summary class="tiny muted">Ver tarifas vigentes</summary>
+        <table style="margin-top:.5rem">
+          <tbody>
+            {% for key, label in DURATIONS.items() %}
+              <tr><td>{{ label }}</td><td class="right bold">{{ tariffs.inscription.get(key, 0) | money }}</td></tr>
+            {% endfor %}
+            <tr><td class="muted">Cada mes adicional</td><td class="right">{{ tariffs.extra_month | money }}</td></tr>
+          </tbody>
+        </table>
+        <p class="tiny muted" style="margin:.5rem 0 0">
+          El total definitivo se recalcula en el servidor al guardar, con estas mismas
+          tarifas, y queda impreso en el recibo.
+        </p>
+      </details>
     </div>
   </form>
+
+  {# --- Rostro para el control de acceso ------------------------------------ #}
+  {% if FACE_ENABLED %}
+    {% set pending = max_faces - face_count %}
+    <div class="card" data-face-enroll
+         data-models-url="{{ url_for('static', filename='vendor/faceapi/models') }}"
+         data-pending="{{ pending }}">
+      <div class="row between" style="margin-bottom:.9rem">
+        <div>
+          <h2 style="margin:0">🎥 Rostro para el acceso</h2>
+          <p class="tiny muted" style="margin:.2rem 0 0">
+            {% if face_count >= max_faces %}
+              {{ face_count }} de {{ max_faces }} muestras registradas: completo.
+            {% elif face_count %}
+              {{ face_count }} de {{ max_faces }} muestras. Faltan {{ pending }} para
+              completar el registro.
+            {% else %}
+              Este cliente todavía no puede entrar por reconocimiento facial.
+              Se toman {{ max_faces }} muestras seguidas, sin tocar nada entre una y otra.
+            {% endif %}
+          </p>
+        </div>
+        <span class="badge {{ 'ok' if face_count else 'none' }}">
+          {{ 'Registrado' if face_count else 'Sin registrar' }}
+        </span>
+      </div>
+
+      {# El formulario solo lleva los campos: los botones viven fuera para no anidar
+         este <form> con el de «eliminar rostros», que HTML no permite. Lo envía el
+         JS cuando ya tiene todas las muestras. #}
+      <form method="post" action="{{ url_for('access.enroll', client_id=client['id']) }}"
+            data-face-form hidden>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="descriptors" value="" data-face-input>
+      </form>
+
+      {# Paso 1: en reposo #}
+      <div data-face-step="idle">
+        <div class="row tight">
+          <button type="button" class="btn btn-primary btn-sm" data-face-action="start"
+                  {{ 'disabled' if pending <= 0 }}>
+            📷 {% if face_count %}Completar ({{ pending }} muestra(s)){% else %}Registrar rostro ({{ max_faces }} muestras){% endif %}
+          </button>
+          {% if face_count %}
+            {{ confirm_form(
+                url_for('access.remove_faces', client_id=client['id']),
+                'Se eliminarán las ' ~ face_count ~ ' muestra(s) de rostro de este cliente y dejará de poder entrar por reconocimiento facial. ¿Continuar?',
+                'Sí, eliminar los rostros',
+                '🗑️ Eliminar rostros registrados'
+            ) }}
+          {% endif %}
+        </div>
+        {% if pending <= 0 %}
+          <p class="tiny muted" style="margin:.5rem 0 0">
+            Alcanzó el máximo de {{ max_faces }} muestras. Elimínelas para volver a capturarlas.
+          </p>
+        {% endif %}
+      </div>
+
+      {# Paso 2: cámara en vivo con comprobación de calidad #}
+      <div data-face-step="camera" hidden>
+        <div class="row" style="align-items:flex-start;gap:1rem">
+          <div class="pc-stage face-stage">
+            <video data-face-video muted playsinline></video>
+            <canvas data-face-overlay></canvas>
+          </div>
+          <div style="flex:1;min-width:220px">
+            <div class="row between" style="margin-bottom:.35rem">
+              <p class="small bold" style="margin:0">Captura automática</p>
+              <span class="tiny bold" data-face-progress></span>
+            </div>
+            <div class="face-bar"><span data-face-bar></span></div>
+
+            <p class="face-pose" data-face-pose></p>
+            <p class="notice" style="margin:.5rem 0 0" data-face-hint>Iniciando la cámara…</p>
+
+            <div class="row tight" style="margin-top:.7rem">
+              <button type="button" class="btn btn-secondary btn-sm" data-face-action="cancel">
+                Cancelar
+              </button>
+            </div>
+            <p class="tiny muted" style="margin:.7rem 0 0">
+              Las muestras se toman solas cuando el encuadre es correcto: no hay que
+              pulsar nada. No se guarda ninguna foto, solo 128 números por muestra.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p class="small" style="color:var(--red-600);margin:.6rem 0 0" data-face-error hidden></p>
+    </div>
+  {% endif %}
 
   <div class="card flush">
     <div style="padding:1.15rem 1.15rem .5rem"><h2 style="margin:0">Historial de inscripciones</h2></div>
@@ -142,7 +282,7 @@
             {% for m in history %}
               <tr>
                 <td class="nowrap muted">{{ m['created_at'] | fechahora }}</td>
-                <td>{{ DURATIONS[m['duration_type']] }}{% if m['duration_type'] == 'MONTH' and m['months'] and m['months'] > 1 %} x {{ m['months'] }}{% endif %}</td>
+                <td>{{ duracion(m['duration_type'], m['quantity']) }}</td>
                 <td class="nowrap">{{ m['start_date'] | fecha }} — {{ m['end_date'] | fecha }}</td>
                 <td>{{ PAYMENT_METHODS.get(m['payment_method'], m['payment_method']) }}</td>
                 <td>{{ m['seller_first'] }} {{ m['seller_last'] }}</td>
@@ -160,4 +300,12 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='membership-total.js') }}" defer></script>
+  {% if FACE_ENABLED %}
+    <script src="{{ url_for('static', filename='vendor/faceapi/face-api.js') }}"></script>
+    <script src="{{ url_for('static', filename='face-enroll.js') }}" defer></script>
+  {% endif %}
 {% endblock %}

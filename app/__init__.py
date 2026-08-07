@@ -49,9 +49,14 @@ def create_app(*, database_path: str | None = None) -> Flask:
     app.before_request(load_logged_in_user)
     app.before_request(verify_csrf)
 
-    from .views import audit, auth, clients, dashboard, memberships, products, sales, tariffs, users
+    from .views import (
+        access, audit, auth, clients, dashboard, income, memberships, products, sales,
+        tariffs, users,
+    )
 
     app.register_blueprint(auth.bp)
+    app.register_blueprint(access.bp)
+    app.register_blueprint(income.bp)
     app.register_blueprint(dashboard.bp)
     app.register_blueprint(clients.bp)
     app.register_blueprint(memberships.bp)
@@ -73,14 +78,24 @@ def create_app(*, database_path: str | None = None) -> Flask:
     @app.context_processor
     def inject_globals() -> dict:
         """Valores disponibles en todas las plantillas sin pasarlos en cada render."""
+        from .settings import face_recognition_enabled
+
         return {
             "current_user": g.get("user"),
+            # La barra lateral y la ficha de inscripción cambian según esté activado
+            # el reconocimiento facial, así que el interruptor va en el contexto común.
+            "FACE_ENABLED": face_recognition_enabled() if g.get("user") else False,
             "ROLES": cfg.ROLES,
             "DURATIONS": cfg.DURATIONS,
             "PAYMENT_METHODS": cfg.PAYMENT_METHODS,
             "SEX_OPTIONS": cfg.SEX_OPTIONS,
             "BLOOD_TYPES": cfg.BLOOD_TYPES,
+            "CLIENT_GOALS": cfg.CLIENT_GOALS,
+            "ACTIVITY_LEVELS": cfg.ACTIVITY_LEVELS,
+            "MAX_HEIGHT_CM": cfg.MAX_HEIGHT_CM,
+            "MAX_WEIGHT_KG": cfg.MAX_WEIGHT_KG,
             "ACTION_LABELS": cfg.ACTION_LABELS,
+            "ACCESS_REASONS": cfg.ACCESS_REASONS,
             "PASSWORD_POLICY_TEXT": cfg.PASSWORD_POLICY_TEXT,
         }
 

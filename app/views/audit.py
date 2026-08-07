@@ -118,6 +118,8 @@ def export_csv():
     filename = f"registro-actividad-{today_str()}.csv"
     return Response(
         data,
-        mimetype="text/csv; charset=utf-8",
+        # content_type y no mimetype: mimetype espera solo el tipo y le añade el
+        # charset por su cuenta, con lo que salía duplicado en la cabecera.
+        content_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

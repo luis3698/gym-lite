@@ -107,6 +107,20 @@
   </div>
 {% endmacro %}
 
+{# Botón «ver más» de una lista plegada.
+   `target` es el id del contenedor cuyas tarjetas sobrantes llevan [data-extra].
+   La lógica está en static/collapse-list.js. #}
+{% macro more_button(target, rest, singular='restante', plural='restantes') %}
+  {% if rest > 0 %}
+    {% set label = 'Ver ' ~ rest ~ ' ' ~ (singular if rest == 1 else plural) ~ ' ▾' %}
+    <div class="center" style="margin-top:.9rem">
+      <button type="button" class="btn btn-secondary btn-sm"
+              data-toggle-more="{{ target }}" aria-controls="{{ target }}" aria-expanded="false"
+              data-more="{{ label }}" data-less="Ver menos ▴">{{ label }}</button>
+    </div>
+  {% endif %}
+{% endmacro %}
+
 {# Confirmación en línea con <details>: reemplaza al modal de la versión React
    sin necesidad de JavaScript. #}
 {% macro confirm_form(action, message, button_label='Eliminar', open_label='Eliminar', ask_password=false, extra_class='btn-ghost-danger btn-sm') %}

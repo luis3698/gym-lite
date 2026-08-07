@@ -1,5 +1,9 @@
 {% extends "base.html" %}
-{% from "_macros.html" import avatar %}
+{% from "_macros.html" import avatar, more_button %}
+
+{# Tarjetas visibles antes de pulsar «ver más»: con muchos clientes las listas
+   empujaban las gráficas y el resto del panel fuera de la pantalla. #}
+{% set PREVIEW = 5 %}
 {% block title %}Inicio — GymManager Lite{% endblock %}
 
 {% block content %}
@@ -51,9 +55,10 @@
     </div>
 
     {% if expired_clients %}
-      <div class="grid auto">
+      <div class="grid auto" id="expired-grid">
         {% for c in expired_clients %}
-          <a class="status-tile expired" href="{{ url_for('memberships.manage', client_id=c['id']) }}">
+          <a class="status-tile expired" href="{{ url_for('memberships.manage', client_id=c['id']) }}"
+             {% if loop.index > PREVIEW %}data-extra hidden{% endif %}>
             {{ avatar(c['photo'], c['first_name']) }}
             <div>
               <p class="name" style="margin:0">{{ c['first_name'] }} {{ c['last_name'] }}</p>
@@ -67,12 +72,13 @@
               hace {{ c['days_expired'] }} día(s)
             </p>
             <span class="tiny" style="opacity:.75">
-              Última: {{ DURATIONS[c['duration_type']] }}{% if c['duration_type'] == 'MONTH' and c['months'] and c['months'] > 1 %} x {{ c['months'] }}{% endif %}
+              Última: {{ duracion(c['duration_type'], c['quantity']) }}
               · {{ c['total'] | money }}
             </span>
           </a>
         {% endfor %}
       </div>
+      {{ more_button('expired-grid', expired_clients | length - PREVIEW, 'vencido más', 'vencidos más') }}
     {% else %}
       <p class="empty">👏 Ningún cliente tiene la inscripción vencida.</p>
     {% endif %}
@@ -90,9 +96,10 @@
           Ver vigentes
         </a>
       </div>
-      <div class="grid auto">
+      <div class="grid auto" id="expiring-grid">
         {% for c in expiring_clients %}
-          <a class="status-tile active" href="{{ url_for('memberships.manage', client_id=c['id']) }}">
+          <a class="status-tile active" href="{{ url_for('memberships.manage', client_id=c['id']) }}"
+             {% if loop.index > PREVIEW %}data-extra hidden{% endif %}>
             {{ avatar(c['photo'], c['first_name']) }}
             <div>
               <p class="name" style="margin:0">{{ c['first_name'] }} {{ c['last_name'] }}</p>
@@ -108,6 +115,7 @@
           </a>
         {% endfor %}
       </div>
+      {{ more_button('expiring-grid', expiring_clients | length - PREVIEW, 'más', 'más') }}
     </div>
   {% endif %}
 
@@ -191,4 +199,8 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='collapse-list.js') }}" defer></script>
 {% endblock %}

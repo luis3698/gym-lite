@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Control de acceso — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Control de acceso</h1>
+    <p class="muted">Reconocimiento facial en la entrada del gimnasio</p>
+  </div>
+
+  {# --- Interruptor --------------------------------------------------------- #}
+  <div class="card">
+    <div class="row between" style="align-items:flex-start">
+      <div style="flex:1;min-width:260px">
+        <h2 style="margin:0 0 .3rem">
+          Reconocimiento facial
+          <span class="badge {{ 'ok' if enabled else 'none' }}" style="vertical-align:middle;margin-left:.4rem">
+            {{ 'Activado' if enabled else 'Desactivado' }}
+          </span>
+        </h2>
+        {% if enabled %}
+          <p class="tiny muted" style="margin:0">
+            La pestaña del kiosco abre la cámara e identifica a quien se acerque. Durante la
+            inscripción se puede registrar el rostro del cliente.
+          </p>
+        {% else %}
+          <p class="tiny muted" style="margin:0">
+            El kiosco no abre la cámara y la inscripción no pide el rostro. Los rostros ya
+            registrados se conservan: al volver a activarlo todo sigue funcionando.
+          </p>
+        {% endif %}
+      </div>
+
+      <form method="post" style="margin-left:auto">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="accion" value="interruptor">
+        <input type="hidden" name="enabled" value="{{ '0' if enabled else '1' }}">
+        <button class="btn {{ 'btn-ghost-danger' if enabled else 'btn-primary' }}">
+          {{ 'Desactivar' if enabled else 'Activar' }}
+        </button>
+      </form>
+    </div>
+
+    {% if enabled %}
+      <div class="row tight" style="margin-top:1rem">
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('access.kiosk') }}" target="_blank" rel="noopener">
+          🎥 Abrir la pantalla del kiosco
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+  {# --- Estado -------------------------------------------------------------- #}
+  <div class="grid cols-4">
+    <div class="card kpi">
+      <div class="icon">🙂</div>
+      <div><p class="tiny muted" style="margin:0">Clientes con rostro</p>
+        <p class="value" style="margin:0">{{ enrolled_clients }}</p>
+        <p class="tiny muted" style="margin:0">de {{ total_clients }} registrados</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">🎞️</div>
+      <div><p class="tiny muted" style="margin:0">Muestras guardadas</p>
+        <p class="value" style="margin:0">{{ total_faces }}</p>
+        <p class="tiny muted" style="margin:0">hasta {{ max_faces }} por cliente</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">🚪</div>
+      <div><p class="tiny muted" style="margin:0">Entradas de hoy</p>
+        <p class="value" style="margin:0">{{ entries_today }}</p>
+        <p class="tiny muted" style="margin:0">permitidas y denegadas</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">⏱️</div>
+      <div><p class="tiny muted" style="margin:0">Antirrebote</p>
+        <p class="value" style="margin:0">{{ cooldown_seconds }}s</p>
+        <p class="tiny muted" style="margin:0">sin repetir la misma entrada</p></div>
+    </div>
+  </div>
+
+  {# --- Antirrebote --------------------------------------------------------- #}
+  <div class="card">
+    <h2 style="margin:0 0 .3rem">Antirrebote</h2>
+    <p class="tiny muted" style="margin:0 0 .9rem">
+      Tiempo que debe pasar para volver a registrar la entrada de la misma persona.
+      Mientras tanto la cámara la sigue reconociendo y mostrando su ficha, pero marcada
+      como «ya se registró», y no se añade una entrada nueva al histórico.
+    </p>
+
+    <form method="post" class="row" style="align-items:flex-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="accion" value="cooldown">
+
+      <label class="field">
+        <span>Segundos</span>
+        <input type="number" name="cooldown_seconds" class="w-sm"
+               min="{{ min_cooldown }}" max="{{ max_cooldown }}" step="1"
+               value="{{ cooldown_seconds }}" required>
+      </label>
+      <button class="btn btn-primary">Guardar</button>
+      <span class="tiny muted">
+        Entre {{ min_cooldown }} y {{ max_cooldown }} segundos ({{ (max_cooldown / 3600) | round | int }} horas).
+      </span>
+    </form>
+
+    <p class="tiny muted" style="margin:.9rem 0 0">
+      Referencias: <strong>90 s</strong> (por defecto) evita el doble registro de quien se
+      queda charlando en la puerta. <strong>4 horas</strong> cuenta como mucho dos entradas
+      al día, mañana y tarde. <strong>12 horas</strong>, una sola entrada por día.
+    </p>
+  </div>
+
+  {# --- Histórico ----------------------------------------------------------- #}
+  <div class="card">
+    <h2>Últimos accesos</h2>
+    {% if recent %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Fecha</th><th>Persona</th><th>Documento</th><th>Resultado</th><th class="right">Similitud</th></tr>
+          </thead>
+          <tbody>
+            {% for r in recent %}
+              <tr>
+                <td>{{ r['created_at'] | fechahora_seg }}</td>
+                <td>{{ (r['first_name'] ~ ' ' ~ r['last_name']) if r['first_name'] else '—' }}</td>
+                <td>{{ r['document_id'] or '—' }}</td>
+                <td>
+                  <span class="badge {{ 'ok' if r['allowed'] else 'fail' }}">
+                    {{ 'Permitido' if r['allowed'] else 'Denegado' }}
+                  </span>
+                  <span class="tiny muted">{{ ACCESS_REASONS.get(r['reason'], r['reason']) }}</span>
+                </td>
+                {# La distancia es lo contrario de la similitud: 0 sería idéntico. Se
+                   muestra al revés para que se lea como un porcentaje de parecido. #}
+                <td class="right tiny">
+                  {{ '%.0f%%' % ((1 - r['distance']) * 100) if r['distance'] is not none else '—' }}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty">Todavía no ha pasado nadie por el kiosco.</p>
+    {% endif %}
+  </div>
+
+  <div class="notice">
+    <strong>Cómo funciona.</strong> Al registrar el rostro se guardan 128 números que
+    describen la cara, nunca una fotografía: con ellos no se puede reconstruir el rostro de
+    nadie. La comparación ocurre dentro de este equipo y no sale a internet. Dos rostros se
+    dan por la misma persona cuando su distancia es menor que {{ '%.2f' % match_threshold }};
+    en la franja de duda el kiosco pide acercarse en vez de arriesgar una identificación.
+  </div>
+</div>
+{% endblock %}

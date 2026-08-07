@@ -39,6 +39,13 @@
         <a href="{{ url_for('users.index') }}" class="{{ 'active' if request.endpoint in ('users.index', 'users.create', 'users.edit') }}">
           <span>👥</span> Administrar usuarios
         </a>
+        <a href="{{ url_for('income.index') }}" class="{{ 'active' if request.blueprint == 'income' }}">
+          <span>💰</span> Ventas e ingresos
+        </a>
+        <a href="{{ url_for('access.config') }}" class="{{ 'active' if request.blueprint == 'access' }}">
+          <span>🎥</span> Control de acceso
+          {% if not FACE_ENABLED %}<span class="nav-off" title="Reconocimiento facial desactivado">off</span>{% endif %}
+        </a>
         <a href="{{ url_for('audit.index') }}" class="{{ 'active' if request.blueprint == 'audit' }}">
           <span>🕵️</span> Registro de actividad
         </a>
@@ -74,7 +81,39 @@
       {% include "_flashes.html" %}
       {% block content %}{% endblock %}
     </main>
+
+    {# Aviso pasajero del kiosco: aparece solo cuando alguien acaba de pasar por la
+       cámara y se desvanece a los pocos segundos, para no tapar la pantalla mientras
+       se trabaja. Con `role="status"` el lector de pantalla lo anuncia sin robar el
+       foco a quien está escribiendo. #}
+    {% if FACE_ENABLED %}
+      <aside class="kiosk-watch no-print" data-kiosk-watch role="status" aria-live="polite"
+             data-url="{{ url_for('access.last_entry') }}" hidden>
+        <header class="kw-head">
+          <span class="kw-title">Kiosco de acceso</span>
+          {# Cuántos más esperan turno cuando entra gente en fila. #}
+          <span class="kw-pending" data-kw-pending hidden></span>
+          <button type="button" class="kw-close" data-kw-close title="Cerrar aviso"
+                  aria-label="Cerrar aviso">×</button>
+        </header>
+        <a class="kw-event" data-kw-event>
+          <div class="kw-photo" data-kw-photo></div>
+          <div class="kw-info">
+            <p class="kw-name" data-kw-name></p>
+            <p class="kw-reason" data-kw-reason></p>
+            <p class="kw-when" data-kw-when></p>
+          </div>
+          <span class="kw-verdict" data-kw-verdict></span>
+        </a>
+        {# Barra que se vacía: se ve cuánto le queda al aviso antes de irse. #}
+        <div class="kw-timer" data-kw-timer><span></span></div>
+      </aside>
+    {% endif %}
+
     {% block scripts %}{% endblock %}
+    {% if FACE_ENABLED %}
+      <script src="{{ url_for('static', filename='kiosk-watch.js') }}" defer></script>
+    {% endif %}
   </div>
 </div>
 {% else %}

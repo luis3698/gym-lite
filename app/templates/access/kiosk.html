@@ -1,0 +1,126 @@
+{# Kiosco de acceso. Documento independiente a propósito: no lleva la barra lateral
+   ni depende de que haya una sesión iniciada, porque se queda encendido en la entrada
+   del gimnasio sin que nadie lo atienda. #}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control de acceso — GymManager Lite</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🎥</text></svg>">
+</head>
+<body class="kiosk-body">
+
+{% if not enabled %}
+  {# Desactivado desde «Control de acceso»: no se carga ni la librería ni los modelos
+     (8 MB) ni se pide la cámara. La pestaña puede quedarse abierta sin gastar nada. #}
+  <div class="kiosk kiosk-off">
+    <div class="kiosk-off-box">
+      <div class="kiosk-off-icon">🎥</div>
+      <h1>Reconocimiento facial desactivado</h1>
+      <p>
+        El control de acceso está apagado. Un administrador puede encenderlo desde
+        <strong>Administración → Control de acceso</strong>.
+      </p>
+      <p class="tiny muted">Los rostros ya registrados se conservan.</p>
+    </div>
+  </div>
+{% else %}
+
+<div class="kiosk"
+     data-kiosk
+     data-models-url="{{ url_for('static', filename='vendor/faceapi/models') }}"
+     data-identify-url="{{ url_for('access.identify') }}"
+     data-csrf="{{ csrf_token() }}">
+
+  <header class="kiosk-top">
+    <div>
+      <p class="kiosk-title">🏋️ Control de acceso</p>
+      <p class="kiosk-sub">Mire a la cámara para registrar su entrada</p>
+    </div>
+    <div class="kiosk-top-right">
+      <span class="kiosk-clock" data-clock>--:--</span>
+      <span class="kiosk-pill" data-engine-state>Iniciando…</span>
+    </div>
+  </header>
+
+  <main class="kiosk-main">
+
+    {# --- Cámara ---------------------------------------------------------- #}
+    <section class="kiosk-camera">
+      <div class="kiosk-stage" data-stage>
+        <video data-video autoplay muted playsinline></video>
+        {# El recuadro sobre el rostro se dibuja aquí, encima del vídeo. #}
+        <canvas data-overlay></canvas>
+
+        <div class="kiosk-veil" data-veil>
+          <div class="kiosk-veil-inner">
+            <div class="kiosk-spinner" data-veil-spinner></div>
+            <p class="kiosk-veil-text" data-veil-text>Cargando el motor de reconocimiento…</p>
+            <p class="kiosk-veil-hint" data-veil-hint>La primera carga tarda unos segundos.</p>
+          </div>
+        </div>
+      </div>
+
+      {# Aviso grande sobre la cámara: es donde se le habla a quien está delante. #}
+      <div class="kiosk-banner" data-banner hidden>
+        <span class="kiosk-banner-icon" data-banner-icon>👥</span>
+        <span data-banner-text></span>
+      </div>
+
+      <p class="kiosk-foot">
+        {% if enrolled_clients %}
+          {{ enrolled_clients }} cliente(s) con rostro registrado ·
+        {% endif %}
+        No se guarda ninguna imagen de la cámara.
+      </p>
+    </section>
+
+    {# --- Ficha de la persona --------------------------------------------- #}
+    <aside class="kiosk-panel" data-panel data-state="idle">
+
+      {# Estado en reposo: nadie delante. #}
+      <div class="kiosk-slot" data-slot="idle">
+        <div class="kiosk-idle-icon">👋</div>
+        <p class="kiosk-idle-title">Acérquese a la cámara</p>
+        <p class="kiosk-idle-text">Su información aparecerá aquí.</p>
+      </div>
+
+      {# Mensaje genérico: no reconocido, dudoso, varias personas, error. #}
+      <div class="kiosk-slot" data-slot="message" hidden>
+        <div class="kiosk-msg-icon" data-msg-icon>❔</div>
+        <p class="kiosk-msg-title" data-msg-title></p>
+        <p class="kiosk-msg-text" data-msg-text></p>
+      </div>
+
+      {# Ficha completa de la persona identificada. #}
+      <div class="kiosk-slot kiosk-card" data-slot="card" hidden>
+        <div class="kiosk-verdict" data-verdict>
+          <span class="kiosk-verdict-icon" data-verdict-icon>✅</span>
+          <span data-verdict-text>ACCESO PERMITIDO</span>
+        </div>
+
+        <div class="kiosk-person">
+          <div class="kiosk-photo" data-photo></div>
+          <div class="kiosk-person-id">
+            <p class="kiosk-name" data-name></p>
+            <p class="kiosk-doc" data-document></p>
+            <span class="badge" data-status-badge></span>
+          </div>
+        </div>
+
+        <dl class="kiosk-facts" data-facts></dl>
+
+        <p class="kiosk-repeat" data-repeat hidden></p>
+      </div>
+
+    </aside>
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/faceapi/face-api.js') }}"></script>
+<script src="{{ url_for('static', filename='kiosk.js') }}" defer></script>
+{% endif %}
+</body>
+</html>

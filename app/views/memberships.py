@@ -4,11 +4,18 @@ from __future__ import annotations
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
-from ..config import MAX_MEMBERSHIP_MONTHS, VALID_DURATIONS, VALID_PAYMENT_METHODS
+from ..config import (
+    MAX_FACES_PER_CLIENT,
+    MAX_MEMBERSHIP_QUANTITY,
+    VALID_DURATIONS,
+    VALID_PAYMENT_METHODS,
+)
 from ..db import query_all, query_one, query_value, transaction
+from ..faces import client_face_count
 from ..helpers import (
     DATE_FMT,
     compute_end_date,
+    duration_label,
     membership_status,
     now_str,
     optional_string,
@@ -18,6 +25,24 @@ from ..helpers import (
 from ..security import audit, roles_required
 
 bp = Blueprint("memberships", __name__, url_prefix="/inscripciones")
+
+
+def compute_base_price(duration: str, quantity: int, tariffs: dict) -> float:
+    """Precio de la inscripción antes de los servicios complementarios.
+
+    Las mensualidades conservan su descuento: el primer mes va a la tarifa de «Por mes»
+    y los siguientes a la de «mes adicional». Las duraciones que se cuentan en días se
+    multiplican tal cual, porque no existe una tarifa de «día adicional» que aplicar y
+    inventarse un descuento cambiaría lo que el gimnasio cobra hoy.
+    """
+    price = tariffs["inscription"].get(duration)
+    if price is None:
+        raise ValueError(
+            "No hay tarifa configurada para esta duración. Configúrela en «Crear tarifas»."
+        )
+    if duration == "MONTH":
+        return price + tariffs["extra_month"] * (quantity - 1)
+    return price * quantity
 
 
 def _load_tariffs() -> dict:
@@ -52,7 +77,7 @@ def index():
         SELECT c.*,
                m.id            AS membership_id,
                m.duration_type AS membership_duration,
-               m.months        AS membership_months,
+               m.quantity      AS membership_quantity,
                m.end_date      AS membership_end,
                m.total         AS membership_total
           FROM clients c
@@ -161,7 +186,9 @@ def manage(client_id: int):
         history=history,
         default_start=default_start,
         form=request.form if request.method == "POST" else {},
-        max_months=MAX_MEMBERSHIP_MONTHS,
+        max_quantity=MAX_MEMBERSHIP_QUANTITY,
+        face_count=client_face_count(client_id),
+        max_faces=MAX_FACES_PER_CLIENT,
     )
 
 
@@ -170,14 +197,13 @@ def _create_membership(client, form, tariffs) -> int:
     if duration not in VALID_DURATIONS:
         raise ValueError("Tipo de inscripción inválido.")
 
-    months = None
-    if duration == "MONTH":
-        raw = (form.get("months") or "").strip()
-        if not raw.isdigit() or int(raw) < 1:
-            raise ValueError("Debe indicar el número de meses (entero mayor o igual a 1).")
-        months = int(raw)
-        if months > MAX_MEMBERSHIP_MONTHS:
-            raise ValueError(f"El número de meses no puede superar {MAX_MEMBERSHIP_MONTHS}.")
+    # La cantidad vale para cualquier duración: 3 días, 2 semanas, 6 meses.
+    raw = (form.get("quantity") or "1").strip()
+    if not raw.isdigit() or int(raw) < 1:
+        raise ValueError("La cantidad debe ser un número entero mayor o igual a 1.")
+    quantity = int(raw)
+    if quantity > MAX_MEMBERSHIP_QUANTITY:
+        raise ValueError(f"La cantidad no puede superar {MAX_MEMBERSHIP_QUANTITY}.")
 
     payment_method = optional_string(form.get("payment_method")) or "EFECTIVO"
     if payment_method not in VALID_PAYMENT_METHODS:
@@ -187,13 +213,7 @@ def _create_membership(client, form, tariffs) -> int:
     if start is None:
         raise ValueError("La fecha de inicio no es válida (formato esperado: AAAA-MM-DD).")
 
-    base_price = tariffs["inscription"].get(duration)
-    if base_price is None:
-        raise ValueError(
-            "No hay tarifa configurada para esta duración. Configúrela en «Crear tarifas»."
-        )
-    if duration == "MONTH" and months and months > 1:
-        base_price += tariffs["extra_month"] * (months - 1)
+    base_price = compute_base_price(duration, quantity, tariffs)
 
     # Los precios de los servicios se releen de la base, nunca se toman del formulario:
     # si no, bastaría con manipular el POST para cobrarse un servicio a cero.
@@ -203,18 +223,18 @@ def _create_membership(client, form, tariffs) -> int:
     chosen = [s for s in tariffs["services"] if s["id"] in selected_ids]
     services_total = sum(s["price"] for s in chosen)
 
-    end = compute_end_date(start, duration, months)
+    end = compute_end_date(start, duration, quantity)
     total = round(base_price + services_total, 2)
     now = now_str()
 
     with transaction() as db:
         cur = db.execute(
-            """INSERT INTO memberships (client_id, sold_by_id, duration_type, months, start_date,
+            """INSERT INTO memberships (client_id, sold_by_id, duration_type, quantity, start_date,
                                         end_date, base_price, services_total, total,
                                         payment_method, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                client["id"], g.user["id"], duration, months, start.strftime(DATE_FMT),
+                client["id"], g.user["id"], duration, quantity, start.strftime(DATE_FMT),
                 end.strftime(DATE_FMT), round(base_price, 2), round(services_total, 2),
                 total, payment_method, now,
             ),
@@ -226,7 +246,10 @@ def _create_membership(client, form, tariffs) -> int:
                 (membership_id, service["id"], service["price"]),
             )
 
-    audit("MEMBERSHIP_CREATED", f"cliente {client['document_id']} - {duration}")
+    audit(
+        "MEMBERSHIP_CREATED",
+        f"cliente {client['document_id']} - {duration_label(duration, quantity)} - {total}",
+    )
     return membership_id
 
 

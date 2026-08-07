@@ -46,6 +46,12 @@
 
 * { box-sizing: border-box; }
 
+/* El atributo [hidden] oculta con `display: none`, pero es la regla de menos peso
+   que existe: cualquier `display: flex` o `display: block` propio la anula y el
+   elemento «oculto» se sigue viendo. Se restablece una vez aquí para todo el
+   proyecto, en lugar de recordar el detalle en cada componente nuevo. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: system-ui, "Segoe UI", Roboto, sans-serif;
@@ -185,6 +191,15 @@ input:focus, select:focus, textarea:focus {
 input:disabled, select:disabled, textarea:disabled { background: var(--slate-50); color: var(--slate-500); }
 textarea { resize: vertical; min-height: 76px; }
 input[type="file"] { font-size: .8rem; padding: .35rem 0; border: 0; }
+
+/* Bloque de campos plegable: lo opcional no debe alargar el formulario de quien
+   solo quiere dar de alta a alguien deprisa. */
+.fieldset {
+  border: 1px solid var(--slate-200); border-radius: 10px;
+  padding: .75rem .9rem; background: var(--slate-50);
+}
+.fieldset > summary { cursor: pointer; font-size: .9rem; }
+.fieldset[open] > summary { margin-bottom: .3rem; }
 
 .checkline { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: var(--slate-600); }
 .checkline input { width: auto; }
@@ -423,6 +438,277 @@ details.confirm .panel p { margin: 0 0 .6rem; font-size: .85rem; color: var(--re
   .sidebar .nav-sep { width: 100%; }
   .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr; }
   main { padding: 1rem; }
+}
+
+.pay-tile {
+  background: var(--slate-50); border: 1px solid var(--slate-200);
+  border-radius: 10px; padding: .7rem .85rem;
+}
+
+/* --- Recuadro del kiosco (fijo en todas las pantallas) ------------------- */
+
+/* Aviso pasajero: solo está en pantalla los segundos siguientes a que alguien pase
+   por la cámara. El resto del tiempo no ocupa nada ni tapa la página. */
+.kiosk-watch {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 40; width: 290px;
+  background: #fff; border: 2px solid var(--slate-300); border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 15%); overflow: hidden;
+
+  /* Estado de reposo del que entra y al que vuelve al irse. */
+  opacity: 0; transform: translateY(12px);
+  transition: opacity .9s ease, transform .9s ease;
+  /* Desvaneciéndose no debe interceptar clics de lo que hay debajo. */
+  pointer-events: none;
+}
+.kiosk-watch.is-visible {
+  opacity: 1; transform: translateY(0);
+  /* La entrada es más rápida que la salida: aparecer tiene que notarse, irse no. */
+  transition: opacity .25s ease, transform .25s ease;
+  pointer-events: auto;
+}
+.kiosk-watch[data-state="allowed"] { border-color: var(--green-500); }
+.kiosk-watch[data-state="denied"]  { border-color: var(--red-500); }
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-watch { transition: none; transform: none; }
+  .kiosk-watch.is-visible { transition: none; transform: none; }
+}
+
+.kw-head {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .4rem .35rem .4rem .65rem; background: var(--slate-100);
+  border-bottom: 1px solid var(--slate-200);
+}
+.kw-title { font-size: .78rem; font-weight: 700; color: var(--slate-600); flex: 1; }
+.kw-pending {
+  background: var(--indigo-600); color: #fff; font-size: .62rem; font-weight: 700;
+  padding: .1rem .3rem; border-radius: 999px;
+}
+.kw-close {
+  background: none; border: 0; cursor: pointer; font: inherit; line-height: 1;
+  font-size: 1.15rem; color: var(--slate-400); padding: 0 .35rem;
+}
+.kw-close:hover { color: var(--slate-700); }
+
+/* Cuenta atrás visible: se vacía hasta que el aviso se va. */
+.kw-timer { height: 3px; background: var(--slate-200); }
+.kw-timer span { display: block; height: 100%; width: 100%; background: var(--slate-400); }
+.kiosk-watch[data-state="allowed"] .kw-timer span { background: var(--green-500); }
+.kiosk-watch[data-state="denied"]  .kw-timer span { background: var(--red-500); }
+
+.kw-event {
+  display: flex; align-items: center; gap: .6rem; padding: .65rem;
+  text-decoration: none; color: inherit;
+}
+.kw-event[href]:hover { background: var(--slate-50); }
+.kw-photo {
+  width: 44px; height: 44px; border-radius: 999px; overflow: hidden; flex-shrink: 0;
+  background: var(--slate-100); color: var(--slate-500);
+  display: flex; align-items: center; justify-content: center; font-weight: 700;
+}
+.kw-photo img { width: 100%; height: 100%; object-fit: cover; }
+.kw-info { min-width: 0; flex: 1; }
+.kw-name   { margin: 0; font-size: .85rem; font-weight: 600; }
+.kw-reason { margin: 0; font-size: .72rem; color: var(--slate-500); }
+.kw-when   { margin: 0; font-size: .68rem; color: var(--slate-400); }
+.kw-verdict {
+  font-size: .6rem; font-weight: 800; letter-spacing: .03em; padding: .2rem .35rem;
+  border-radius: 4px; flex-shrink: 0;
+}
+.kiosk-watch[data-state="allowed"] .kw-verdict { background: var(--green-100); color: var(--green-700); }
+.kiosk-watch[data-state="denied"]  .kw-verdict { background: var(--red-100);   color: var(--red-700); }
+
+/* En pantallas estrechas ocupa el ancho, pero sigue flotando: si pasara a formar
+   parte del flujo, aparecer y desaparecer movería la página bajo el dedo. */
+@media (max-width: 720px) {
+  .kiosk-watch { left: 1rem; right: 1rem; width: auto; }
+}
+
+/* --- Resumen en vivo de la inscripción ----------------------------------- */
+
+.summary-lines { display: flex; flex-direction: column; gap: .1rem; }
+.summary-line {
+  display: flex; justify-content: space-between; gap: 1rem;
+  padding: .45rem 0; border-bottom: 1px dashed var(--slate-200); font-size: .88rem;
+}
+.summary-line span:first-child { color: var(--slate-600); }
+
+.summary-total {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+  padding: .75rem .9rem; border-radius: 10px;
+  background: var(--green-50); border: 1px solid var(--green-100);
+  font-weight: 700; color: var(--green-700);
+}
+.summary-total span:last-child { font-size: 1.5rem; }
+
+.tariff-details summary { cursor: pointer; }
+
+/* --- Kiosco de acceso ---------------------------------------------------- */
+/* Pantalla aparte, en oscuro: se queda encendida horas en la entrada y así cansa
+   menos la vista, destaca sobre el fondo del local y el verde/rojo del veredicto se
+   lee de un vistazo desde lejos. */
+
+.kiosk-body { margin: 0; background: #0b1220; color: #e2e8f0; }
+
+.kiosk { min-height: 100vh; display: flex; flex-direction: column; }
+
+.kiosk-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid #1e293b;
+}
+.kiosk-title { margin: 0; font-size: 1.35rem; font-weight: 700; }
+.kiosk-sub { margin: .15rem 0 0; font-size: .85rem; color: #94a3b8; }
+.kiosk-top-right { display: flex; align-items: center; gap: 1rem; }
+.kiosk-clock { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.kiosk-pill {
+  padding: .3rem .7rem; border-radius: 999px; font-size: .75rem; font-weight: 600;
+  background: #1e293b; color: #94a3b8;
+}
+.kiosk-pill[data-kind="ok"]    { background: #14532d; color: #86efac; }
+.kiosk-pill[data-kind="error"] { background: #7f1d1d; color: #fecaca; }
+
+.kiosk-main {
+  flex: 1; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(340px, 1fr);
+  gap: 1.25rem; padding: 1.25rem 1.5rem 1.5rem; align-items: start;
+}
+
+.kiosk-camera { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+
+.kiosk-stage {
+  position: relative; width: 100%; aspect-ratio: 4 / 3;
+  border-radius: 16px; overflow: hidden; background: #000;
+  border: 1px solid #1e293b;
+}
+/* Espejo: encuadrarse de frente es mucho más natural viéndose como en un espejo.
+   El recuadro va dentro del mismo reflejo, así queda encima del rostro y no al lado
+   contrario. */
+.kiosk-stage video,
+.kiosk-stage canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; transform: scaleX(-1);
+}
+
+.kiosk-veil {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgb(11 18 32 / 92%); text-align: center; padding: 1.5rem;
+}
+.kiosk-veil-text { margin: .8rem 0 .3rem; font-size: 1.1rem; font-weight: 600; }
+.kiosk-veil-hint { margin: 0; font-size: .85rem; color: #94a3b8; }
+.kiosk-spinner {
+  width: 40px; height: 40px; margin: 0 auto; border-radius: 999px;
+  border: 4px solid #1e293b; border-top-color: #6366f1;
+  animation: kiosk-spin 1s linear infinite;
+}
+@keyframes kiosk-spin { to { transform: rotate(360deg); } }
+/* Sin esto el aviso gira sin parar en el equipo de quien pidió no ver animaciones. */
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-spinner { animation: none; }
+}
+
+.kiosk-banner {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .7rem 1rem; border-radius: 12px; font-weight: 600;
+  background: #422006; color: #fcd34d; border: 1px solid #78350f;
+}
+.kiosk-banner-icon { font-size: 1.3rem; }
+
+.kiosk-foot { margin: 0; font-size: .78rem; color: #64748b; }
+
+/* --- Panel derecho del kiosco --- */
+
+.kiosk-panel {
+  border-radius: 16px; padding: 1.5rem; min-height: 420px;
+  background: #111c31; border: 2px solid #1e293b;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.kiosk-panel[data-state="allowed"]   { background: #052e16; border-color: #16a34a; }
+.kiosk-panel[data-state="denied"]    { background: #300f0f; border-color: #dc2626; }
+.kiosk-panel[data-state="multiple"]  { background: #2c1a06; border-color: #d97706; }
+.kiosk-panel[data-state="uncertain"] { background: #2c1a06; border-color: #d97706; }
+.kiosk-panel[data-state="far"]       { background: #1c2333; border-color: #475569; }
+.kiosk-panel[data-state="error"]     { background: #300f0f; border-color: #dc2626; }
+
+.kiosk-slot { text-align: center; }
+
+.kiosk-idle-icon, .kiosk-msg-icon { font-size: 3.5rem; line-height: 1; }
+.kiosk-idle-title, .kiosk-msg-title { margin: .7rem 0 .3rem; font-size: 1.5rem; font-weight: 700; }
+.kiosk-idle-text, .kiosk-msg-text { margin: 0; color: #94a3b8; font-size: .95rem; }
+
+.kiosk-card { text-align: left; }
+
+.kiosk-verdict {
+  display: flex; align-items: center; justify-content: center; gap: .5rem;
+  font-size: 1.35rem; font-weight: 800; letter-spacing: .02em;
+  padding: .6rem; border-radius: 10px; margin-bottom: 1.1rem;
+  background: rgb(255 255 255 / 8%);
+}
+.kiosk-verdict-icon { font-size: 1.6rem; }
+
+.kiosk-person { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.1rem; }
+.kiosk-photo {
+  width: 96px; height: 96px; border-radius: 999px; flex-shrink: 0; overflow: hidden;
+  background: #1e293b; color: #cbd5e1;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.4rem; font-weight: 700;
+}
+.kiosk-photo img { width: 100%; height: 100%; object-fit: cover; }
+.kiosk-person-id { min-width: 0; }
+.kiosk-name { margin: 0; font-size: 1.45rem; font-weight: 700; line-height: 1.15; }
+.kiosk-doc { margin: .2rem 0 .45rem; font-size: .85rem; color: #94a3b8; }
+
+/* dl a dos columnas: la etiqueta se mantiene estrecha y el valor ocupa el resto. */
+.kiosk-facts {
+  margin: 0; display: grid; grid-template-columns: auto 1fr;
+  gap: .4rem 1rem; font-size: .92rem;
+}
+.kiosk-facts dt { color: #94a3b8; }
+.kiosk-facts dd { margin: 0; font-weight: 600; text-align: right; }
+
+.kiosk-repeat {
+  margin: 1rem 0 0; padding: .55rem .75rem; border-radius: 8px;
+  background: rgb(255 255 255 / 8%); font-size: .85rem; color: #cbd5e1; text-align: center;
+}
+
+/* --- Kiosco apagado --- */
+
+.kiosk-off { align-items: center; justify-content: center; text-align: center; padding: 2rem; }
+.kiosk-off-box { max-width: 460px; margin: auto; }
+.kiosk-off-icon { font-size: 4rem; opacity: .5; }
+.kiosk-off h1 { font-size: 1.6rem; margin: .8rem 0 .6rem; }
+.kiosk-off p { color: #94a3b8; }
+
+@media (max-width: 980px) {
+  .kiosk-main { grid-template-columns: 1fr; }
+  .kiosk-panel { min-height: 0; }
+}
+
+/* --- Captura del rostro en la inscripción -------------------------------- */
+
+.face-bar {
+  height: 6px; border-radius: 999px; background: var(--slate-200); overflow: hidden;
+}
+.face-bar span {
+  display: block; height: 100%; width: 0; background: var(--green-500);
+  transition: width .25s ease;
+}
+.face-pose {
+  margin: .6rem 0 0; font-size: .95rem; font-weight: 600; color: var(--indigo-700);
+}
+
+.face-stage { position: relative; }
+/* El recuadro se dibuja sobre el vídeo, que .pc-stage ya muestra en espejo; el
+   canvas necesita el mismo reflejo para caer encima de la cara y no al otro lado. */
+.face-stage canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  transform: scaleX(-1); cursor: default;
+}
+
+/* Aviso «off» junto a la entrada del menú cuando el reconocimiento está apagado. */
+.nav-off {
+  margin-left: auto; padding: .05rem .35rem; border-radius: 4px;
+  background: var(--slate-200); color: var(--slate-600);
+  font-size: .62rem; font-weight: 700; text-transform: uppercase;
 }
 
 /* --- Impresión: solo el recibo ------------------------------------------- */

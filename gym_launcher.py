@@ -124,7 +124,18 @@ def run_window() -> int:
         return 1
 
     url = f"http://localhost:{port}"
+    kiosk_url = f"{url}/acceso/"
     data_dir = Path(flask_app.config["DATABASE"]).parent
+
+    # El kiosco solo se abre solo si el reconocimiento facial está activado. Si el
+    # gimnasio no lo usa, una pestaña con la cámara apagada es solo un estorbo.
+    try:
+        with flask_app.app_context():
+            from app.settings import face_recognition_enabled
+
+            kiosk_enabled = face_recognition_enabled()
+    except Exception:  # noqa: BLE001 — un ajuste ilegible no puede impedir arrancar
+        kiosk_enabled = False
 
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
@@ -165,12 +176,17 @@ def run_window() -> int:
     def open_browser() -> None:
         webbrowser.open(url)
 
+    def open_kiosk() -> None:
+        webbrowser.open_new_tab(kiosk_url)
+
     def quit_app() -> None:
         threading.Thread(target=server.shutdown, daemon=True).start()
         root.after(400, root.destroy)
 
     ttk.Button(buttons, text="Abrir en el navegador", command=open_browser).grid(row=0, column=0)
-    ttk.Button(buttons, text="Detener y salir", command=quit_app).grid(row=0, column=1, padx=(8, 0))
+    if kiosk_enabled:
+        ttk.Button(buttons, text="Abrir el kiosco", command=open_kiosk).grid(row=0, column=1, padx=(8, 0))
+    ttk.Button(buttons, text="Detener y salir", command=quit_app).grid(row=0, column=2, padx=(8, 0))
 
     root.protocol("WM_DELETE_WINDOW", quit_app)
 
@@ -181,9 +197,12 @@ def run_window() -> int:
     root.geometry(f"+{x}+{y}")
 
     # Un pequeño retraso evita que el navegador cargue antes de que el servidor
-    # acepte conexiones.
+    # acepte conexiones. El kiosco va después, en su propia pestaña: abrir los dos a
+    # la vez hace que el navegador decida el orden y a veces el kiosco queda delante.
     if "--no-browser" not in sys.argv[1:]:
         root.after(600, open_browser)
+        if kiosk_enabled:
+            root.after(1800, open_kiosk)
     root.mainloop()
     return 0
 

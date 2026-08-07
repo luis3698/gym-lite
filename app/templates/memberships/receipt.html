@@ -27,7 +27,7 @@
         {{ membership['client_first'] }} {{ membership['client_last'] }} — {{ membership['client_document'] }}
       </p>
       <p style="margin:0" class="muted">
-        Duración: {{ DURATIONS[membership['duration_type']] }}{% if membership['duration_type'] == 'MONTH' and membership['months'] and membership['months'] > 1 %} x {{ membership['months'] }}{% endif %}
+        Duración: {{ duracion(membership['duration_type'], membership['quantity']) }}
       </p>
       <p style="margin:0" class="muted">
         Vigencia: {{ membership['start_date'] | fecha }} — {{ membership['end_date'] | fecha }}

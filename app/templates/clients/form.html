@@ -42,6 +42,77 @@
         <input type="text" name="emergency_contact_phone" value="{{ client['emergency_contact_phone'] or '' }}"></label>
     </div>
 
+    {# --- Ficha deportiva y de salud (todo opcional) ------------------------ #}
+    <details class="fieldset" {{ 'open' if not is_new and (client['blood_type'] or client['height_cm'] or client['weight_kg'] or client['goal'] or client['medical_conditions'] or client['allergies']) }}>
+      <summary>
+        <span class="bold">Ficha deportiva y de salud</span>
+        <span class="tiny muted"> — opcional, se puede completar más adelante</span>
+      </summary>
+
+      <div class="grid cols-3" style="margin-top:1rem">
+        <label class="field"><span>Tipo de sangre</span>
+          <select name="blood_type">
+            <option value="">Sin especificar</option>
+            {% for b in BLOOD_TYPES %}
+              <option value="{{ b }}" {{ 'selected' if client['blood_type'] == b }}>{{ b }}</option>
+            {% endfor %}
+          </select></label>
+
+        <label class="field"><span>Altura <span class="muted">(cm)</span></span>
+          <input type="number" name="height_cm" step="0.5" min="1" max="{{ MAX_HEIGHT_CM }}"
+                 placeholder="p. ej. 172"
+                 value="{{ client['height_cm'] | num if client['height_cm'] else '' }}"></label>
+
+        <label class="field"><span>Peso <span class="muted">(kg)</span></span>
+          <input type="number" name="weight_kg" step="0.1" min="1" max="{{ MAX_WEIGHT_KG }}"
+                 placeholder="p. ej. 68.5"
+                 value="{{ client['weight_kg'] | num if client['weight_kg'] else '' }}"></label>
+
+        <label class="field"><span>Objetivo</span>
+          <select name="goal">
+            <option value="">Sin especificar</option>
+            {% for g in CLIENT_GOALS %}
+              <option value="{{ g }}" {{ 'selected' if client['goal'] == g }}>{{ g }}</option>
+            {% endfor %}
+          </select></label>
+
+        <label class="field"><span>Nivel de actividad</span>
+          <select name="activity_level">
+            <option value="">Sin especificar</option>
+            {% for n in ACTIVITY_LEVELS %}
+              <option value="{{ n }}" {{ 'selected' if client['activity_level'] == n }}>{{ n }}</option>
+            {% endfor %}
+          </select></label>
+
+        <label class="field"><span>EPS o seguro médico</span>
+          <input type="text" name="health_insurance" value="{{ client['health_insurance'] or '' }}"></label>
+      </div>
+
+      <div class="grid cols-2" style="margin-top:.75rem">
+        <label class="field">
+          <span>Condiciones médicas o lesiones</span>
+          <textarea name="medical_conditions" rows="2"
+                    placeholder="Hipertensión, lesión de rodilla, cirugía reciente…">{{ client['medical_conditions'] or '' }}</textarea>
+        </label>
+        <label class="field">
+          <span>Alergias</span>
+          <textarea name="allergies" rows="2"
+                    placeholder="Medicamentos, alimentos, látex…">{{ client['allergies'] or '' }}</textarea>
+        </label>
+      </div>
+
+      <label class="field" style="margin-top:.75rem">
+        <span>Observaciones</span>
+        <textarea name="notes" rows="2"
+                  placeholder="Cualquier cosa que convenga recordar de este cliente.">{{ client['notes'] or '' }}</textarea>
+      </label>
+
+      <p class="tiny muted" style="margin:.75rem 0 0">
+        Estos datos ayudan a atender una urgencia y a orientar el entrenamiento. Ninguno es
+        obligatorio y se pueden rellenar después desde «Editar cliente».
+      </p>
+    </details>
+
     <div class="row">
       <button class="btn btn-primary">{{ 'Registrar cliente' if is_new else 'Guardar cambios' }}</button>
       <a class="btn btn-secondary"

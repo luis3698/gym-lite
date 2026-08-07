@@ -82,7 +82,7 @@ def index():
     # inscripción anterior está vencida pero el cliente está al día.
     expired_clients = query_all(
         """SELECT c.id, c.first_name, c.last_name, c.document_id, c.phone, c.email, c.photo,
-                  m.end_date, m.duration_type, m.months, m.total,
+                  m.end_date, m.duration_type, m.quantity, m.total,
                   CAST(julianday(?) - julianday(m.end_date) AS INTEGER) AS days_expired
              FROM clients c
              JOIN memberships m

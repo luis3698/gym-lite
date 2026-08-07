@@ -32,6 +32,62 @@
     </div>
   </div>
 
+  {# --- Ficha deportiva: solo se muestra si hay algo que mostrar ------------ #}
+  {% set tiene_ficha = client['blood_type'] or client['height_cm'] or client['weight_kg']
+                       or client['goal'] or client['activity_level'] or client['medical_conditions']
+                       or client['allergies'] or client['health_insurance'] or client['notes'] %}
+  <div class="card">
+    <div class="row between" style="margin-bottom:.6rem">
+      <h2 style="margin:0">Ficha deportiva y de salud</h2>
+      {% if imc %}
+        <span class="badge {{ 'ok' if imc_categoria == 'Peso normal' else 'draft' }}">
+          IMC {{ imc }} · {{ imc_categoria }}
+        </span>
+      {% endif %}
+    </div>
+
+    {% if tiene_ficha %}
+      <div class="deflist">
+        <div><span class="k">Tipo de sangre</span><span class="v">{{ client['blood_type'] or '—' }}</span></div>
+        <div><span class="k">Altura</span><span class="v">{{ (client['height_cm'] | num) ~ ' cm' if client['height_cm'] else '—' }}</span></div>
+        <div><span class="k">Peso</span><span class="v">{{ (client['weight_kg'] | num) ~ ' kg' if client['weight_kg'] else '—' }}</span></div>
+        <div><span class="k">Objetivo</span><span class="v">{{ client['goal'] or '—' }}</span></div>
+        <div><span class="k">Nivel de actividad</span><span class="v">{{ client['activity_level'] or '—' }}</span></div>
+        <div><span class="k">EPS o seguro</span><span class="v">{{ client['health_insurance'] or '—' }}</span></div>
+      </div>
+
+      {% if client['medical_conditions'] or client['allergies'] %}
+        <div class="grid cols-2" style="margin-top:1rem">
+          {% if client['medical_conditions'] %}
+            <div class="notice" style="background:var(--amber-50);border-color:var(--amber-200)">
+              <p class="tiny bold" style="margin:0 0 .2rem;color:var(--amber-700)">⚕️ Condiciones médicas o lesiones</p>
+              <p style="margin:0">{{ client['medical_conditions'] }}</p>
+            </div>
+          {% endif %}
+          {% if client['allergies'] %}
+            <div class="notice" style="background:var(--red-50);border-color:var(--red-200)">
+              <p class="tiny bold" style="margin:0 0 .2rem;color:var(--red-700)">⚠️ Alergias</p>
+              <p style="margin:0">{{ client['allergies'] }}</p>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {% if client['notes'] %}
+        <div class="notice" style="margin-top:1rem">
+          <p class="tiny bold" style="margin:0 0 .2rem">Observaciones</p>
+          <p style="margin:0">{{ client['notes'] }}</p>
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="empty" style="padding:1rem 0">
+        Sin datos deportivos.
+        <a href="{{ url_for('clients.edit', client_id=client['id']) }}">Complételos desde «Editar datos»</a>
+        para tener a mano el tipo de sangre, las alergias y el objetivo del cliente.
+      </p>
+    {% endif %}
+  </div>
+
   <div class="card flush">
     <div style="padding:1.15rem 1.15rem .5rem"><h2 style="margin:0">Inscripciones</h2></div>
     {% if memberships %}
@@ -44,7 +100,7 @@
             {% for m in memberships %}
               <tr>
                 <td class="nowrap muted">{{ m['created_at'] | fechahora }}</td>
-                <td>{{ DURATIONS[m['duration_type']] }}{% if m['duration_type'] == 'MONTH' and m['months'] and m['months'] > 1 %} x {{ m['months'] }}{% endif %}</td>
+                <td>{{ duracion(m['duration_type'], m['quantity']) }}</td>
                 <td class="nowrap">{{ m['start_date'] | fecha }} — {{ m['end_date'] | fecha }}</td>
                 <td>{{ m['seller_first'] }} {{ m['seller_last'] }}</td>
                 <td class="right bold">{{ m['total'] | money }}</td>

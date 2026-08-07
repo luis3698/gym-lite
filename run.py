@@ -53,10 +53,17 @@ def main() -> int:
     app = create_app()
     url = f"http://{'localhost' if args.host == '0.0.0.0' else args.host}:{args.port}"
 
+    with app.app_context():
+        from app.settings import face_recognition_enabled
+
+        kiosk_enabled = face_recognition_enabled()
+
     print("\n" + "=" * 58)
     print("  GymManager Lite")
     print("=" * 58)
     print(f"  Abra en el navegador:  {url}")
+    if kiosk_enabled:
+        print(f"  Kiosco de acceso:      {url}/acceso/")
     print(f"  Base de datos:         {app.config['DATABASE']}")
     print("  Detener el servidor:   Ctrl+C")
     print("=" * 58 + "\n")
@@ -65,6 +72,8 @@ def main() -> int:
     # en la pasada real evita que se abran dos pestañas.
     if not args.no_browser and not args.debug:
         Timer(1.0, lambda: webbrowser.open(url)).start()
+        if kiosk_enabled:
+            Timer(2.2, lambda: webbrowser.open_new_tab(f"{url}/acceso/")).start()
 
     app.run(host=args.host, port=args.port, debug=args.debug)
     return 0

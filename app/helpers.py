@@ -55,6 +55,56 @@ def parse_optional_int(value: Any, *, minimum: int = 0, maximum: int | None = No
     return number
 
 
+def parse_optional_decimal(
+    value: Any, *, field: str, minimum: float = 0, maximum: float | None = None
+) -> float | None:
+    """Número con decimales opcional (altura, peso). None si viene vacío.
+
+    Acepta coma como separador decimal: es lo que se teclea aquí y rechazarlo solo
+    consigue que el dato se quede sin rellenar.
+    """
+    if value is None:
+        return None
+    text = str(value).strip().replace(",", ".")
+    if not text:
+        return None
+    try:
+        number = float(text)
+    except ValueError:
+        raise InvalidNumber(f"{field} debe ser un número.") from None
+    if number != number or number in (float("inf"), float("-inf")):
+        raise InvalidNumber(f"{field} debe ser un número.")
+    if number <= minimum or (maximum is not None and number > maximum):
+        limite = f"entre {minimum:g} y {maximum:g}" if maximum is not None else f"mayor que {minimum:g}"
+        raise InvalidNumber(f"{field} debe estar {limite}.")
+    return round(number, 2)
+
+
+def body_mass_index(height_cm: Any, weight_kg: Any) -> float | None:
+    """IMC a partir de altura y peso, o None si falta alguno."""
+    try:
+        height = float(height_cm or 0) / 100
+        weight = float(weight_kg or 0)
+    except (TypeError, ValueError):
+        return None
+    if height <= 0 or weight <= 0:
+        return None
+    return round(weight / (height * height), 1)
+
+
+def bmi_category(bmi: float | None) -> str:
+    """Etiqueta orientativa del IMC (clasificación de la OMS)."""
+    if bmi is None:
+        return ""
+    if bmi < 18.5:
+        return "Bajo peso"
+    if bmi < 25:
+        return "Peso normal"
+    if bmi < 30:
+        return "Sobrepeso"
+    return "Obesidad"
+
+
 def parse_age(value: Any) -> int | None:
     try:
         return parse_optional_int(value, minimum=0, maximum=MAX_AGE)
@@ -163,16 +213,32 @@ def add_months(start: date, months: int) -> date:
     return date(year, month, day)
 
 
-def compute_end_date(start: date, duration_type: str, months: int | None) -> date:
-    if duration_type == "DAY_1":
-        return start + timedelta(days=1)
-    if duration_type == "DAY_7":
-        return start + timedelta(days=7)
-    if duration_type == "DAY_15":
-        return start + timedelta(days=15)
+# Días que dura cada tipo, para las duraciones que se cuentan en días. Los meses van
+# aparte porque no todos duran lo mismo.
+DURATION_DAYS = {"DAY_1": 1, "DAY_7": 7, "DAY_15": 15}
+
+
+def compute_end_date(start: date, duration_type: str, quantity: int | None) -> date:
+    """Vencimiento al comprar `quantity` veces la duración elegida.
+
+    La cantidad ya no es exclusiva de las mensualidades: se pueden pagar 3 días o
+    2 quincenas igual que 6 meses.
+    """
+    count = max(1, quantity or 1)
+    if duration_type in DURATION_DAYS:
+        return start + timedelta(days=DURATION_DAYS[duration_type] * count)
     if duration_type == "MONTH":
-        return add_months(start, max(1, months or 1))
+        return add_months(start, count)
     raise ValueError(f"Duración desconocida: {duration_type}")
+
+
+def duration_label(duration_type: str, quantity: int | None = None) -> str:
+    """'Por mes x 3', '1 día x 5', '7 días'. Se usa en recibos, tableros e histórico."""
+    from .config import DURATIONS
+
+    base = DURATIONS.get(duration_type, duration_type)
+    count = quantity or 1
+    return f"{base} x {count}" if count > 1 else base
 
 
 def membership_status(end_date_str: str | None) -> tuple[str, int | None]:
@@ -264,3 +330,5 @@ def register_filters(app) -> None:
     app.jinja_env.filters["fecha"] = format_date
     app.jinja_env.filters["fechahora"] = format_datetime
     app.jinja_env.filters["fechahora_seg"] = format_datetime_seconds
+    # Global y no filtro: recibe dos argumentos y se lee mejor como duracion(a, b).
+    app.jinja_env.globals["duracion"] = duration_label

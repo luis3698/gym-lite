@@ -8,9 +8,25 @@ from __future__ import annotations
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
-from ..config import MAX_AGE
+from ..config import (
+    ACTIVITY_LEVELS,
+    BLOOD_TYPES,
+    CLIENT_GOALS,
+    MAX_AGE,
+    MAX_HEIGHT_CM,
+    MAX_WEIGHT_KG,
+)
 from ..db import execute, insert, query_all, query_one, query_value, transaction
-from ..helpers import InvalidNumber, is_valid_email, now_str, optional_string, parse_age
+from ..helpers import (
+    InvalidNumber,
+    bmi_category,
+    body_mass_index,
+    is_valid_email,
+    now_str,
+    optional_string,
+    parse_age,
+    parse_optional_decimal,
+)
 from ..security import audit, roles_required, verify_password
 from ..uploads import UploadError, delete_image, resolve_captured_photo
 
@@ -31,8 +47,24 @@ def _read_form(form) -> dict:
 
     try:
         age = parse_age(form.get("age"))
+        height = parse_optional_decimal(
+            form.get("height_cm"), field="La altura", maximum=MAX_HEIGHT_CM)
+        weight = parse_optional_decimal(
+            form.get("weight_kg"), field="El peso", maximum=MAX_WEIGHT_KG)
     except InvalidNumber as exc:
         raise ValueError(str(exc)) from None
+
+    # Las listas cerradas se validan contra su catálogo: un <select> manipulado no debe
+    # meter valores que después no encajen en los filtros ni en los informes.
+    blood_type = optional_string(form.get("blood_type"))
+    if blood_type and blood_type not in BLOOD_TYPES:
+        raise ValueError("Tipo de sangre inválido.")
+    goal = optional_string(form.get("goal"))
+    if goal and goal not in CLIENT_GOALS:
+        raise ValueError("Objetivo inválido.")
+    activity_level = optional_string(form.get("activity_level"))
+    if activity_level and activity_level not in ACTIVITY_LEVELS:
+        raise ValueError("Nivel de actividad inválido.")
 
     return {
         "first_name": first_name,
@@ -44,7 +76,28 @@ def _read_form(form) -> dict:
         "email": email,
         "emergency_contact_name": optional_string(form.get("emergency_contact_name")),
         "emergency_contact_phone": optional_string(form.get("emergency_contact_phone")),
+        # Ficha deportiva: toda opcional.
+        "blood_type": blood_type,
+        "height_cm": height,
+        "weight_kg": weight,
+        "goal": goal,
+        "activity_level": activity_level,
+        "medical_conditions": optional_string(form.get("medical_conditions")),
+        "allergies": optional_string(form.get("allergies")),
+        "health_insurance": optional_string(form.get("health_insurance")),
+        "notes": optional_string(form.get("notes")),
     }
+
+
+# Columnas que se escriben desde el formulario, en el orden en que viajan a la base.
+# Tenerlas en un solo sitio evita que un campo nuevo se añada al INSERT y se olvide en
+# el UPDATE, que es como los datos acaban guardándose solo al crear.
+CLIENT_FIELDS = (
+    "first_name", "last_name", "document_id", "sex", "age", "phone", "email",
+    "emergency_contact_name", "emergency_contact_phone",
+    "blood_type", "height_cm", "weight_kg", "goal", "activity_level",
+    "medical_conditions", "allergies", "health_insurance", "notes",
+)
 
 
 def _check_duplicates(document_id: str, email: str | None, exclude_id: int | None = None) -> None:
@@ -111,16 +164,12 @@ def create():
             photo, _ = resolve_captured_photo(None, request.form.get("photo_data"))
 
             now = now_str()
+            columnas = ", ".join(CLIENT_FIELDS)
+            marcadores = ", ".join("?" for _ in CLIENT_FIELDS)
             client_id = insert(
-                """INSERT INTO clients (first_name, last_name, document_id, sex, age, phone, email,
-                                        emergency_contact_name, emergency_contact_phone, photo,
-                                        created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    data["first_name"], data["last_name"], data["document_id"], data["sex"],
-                    data["age"], data["phone"], data["email"], data["emergency_contact_name"],
-                    data["emergency_contact_phone"], photo, now, now,
-                ),
+                f"""INSERT INTO clients ({columnas}, photo, created_at, updated_at)
+                    VALUES ({marcadores}, ?, ?, ?)""",
+                [data[c] for c in CLIENT_FIELDS] + [photo, now, now],
             )
             audit("CLIENT_CREATED", data["document_id"])
             flash(f"Cliente {data['first_name']} {data['last_name']} registrado correctamente.", "success")
@@ -150,8 +199,14 @@ def detail(client_id: int):
         "SELECT * FROM sales WHERE client_id = ? ORDER BY created_at DESC LIMIT 20",
         (client_id,),
     )
+    imc = body_mass_index(client["height_cm"], client["weight_kg"])
     return render_template(
-        "clients/detail.html", client=client, memberships=memberships, sales=sales
+        "clients/detail.html",
+        client=client,
+        memberships=memberships,
+        sales=sales,
+        imc=imc,
+        imc_categoria=bmi_category(imc),
     )
 
 
@@ -168,17 +223,10 @@ def edit(client_id: int):
             data = _read_form(request.form)
             _check_duplicates(data["document_id"], data["email"], exclude_id=client_id)
             photo, to_delete = resolve_captured_photo(client["photo"], request.form.get("photo_data"))
+            asignaciones = ", ".join(f"{c} = ?" for c in CLIENT_FIELDS)
             execute(
-                """UPDATE clients
-                      SET first_name = ?, last_name = ?, document_id = ?, sex = ?, age = ?,
-                          phone = ?, email = ?, emergency_contact_name = ?,
-                          emergency_contact_phone = ?, photo = ?, updated_at = ?
-                    WHERE id = ?""",
-                (
-                    data["first_name"], data["last_name"], data["document_id"], data["sex"],
-                    data["age"], data["phone"], data["email"], data["emergency_contact_name"],
-                    data["emergency_contact_phone"], photo, now_str(), client_id,
-                ),
+                f"UPDATE clients SET {asignaciones}, photo = ?, updated_at = ? WHERE id = ?",
+                [data[c] for c in CLIENT_FIELDS] + [photo, now_str(), client_id],
             )
             # La foto anterior se borra solo después de que la fila se guardó bien.
             delete_image(to_delete)
