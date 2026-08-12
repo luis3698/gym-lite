@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Histórico de devoluciones — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div>
+      <h1>Histórico de devoluciones</h1>
+      <p class="muted">Todo el dinero que ha salido por devoluciones, con su motivo y quién lo autorizó.</p>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('refunds.index') }}">← Registrar una devolución</a>
+  </div>
+
+  <form class="card" method="get">
+    <div class="row">
+      <label class="field"><span>Tipo de recibo</span>
+        <select name="tipo" class="w-md">
+          <option value="">Todos</option>
+          <option value="SALE" {{ 'selected' if filtros.tipo == 'SALE' }}>Ventas</option>
+          <option value="MEMBERSHIP" {{ 'selected' if filtros.tipo == 'MEMBERSHIP' }}>Inscripciones</option>
+        </select></label>
+
+      <label class="field"><span>Forma de devolución</span>
+        <select name="metodo" class="w-md">
+          <option value="">Todas</option>
+          {% for key, label in metodos.items() %}
+            <option value="{{ key }}" {{ 'selected' if filtros.metodo == key }}>{{ label }}</option>
+          {% endfor %}
+        </select></label>
+
+      <label class="field"><span>Motivo o número</span>
+        <input type="search" name="q" value="{{ filtros.q }}" placeholder="Buscar" class="w-md"></label>
+
+      <label class="field"><span>Desde</span>
+        <input type="date" name="from" value="{{ filtros['from'] }}"></label>
+      <label class="field"><span>Hasta</span>
+        <input type="date" name="to" value="{{ filtros.to }}"></label>
+
+      <button class="btn btn-primary">Aplicar filtros</button>
+      <a class="btn btn-secondary" href="{{ url_for('refunds.history') }}">Limpiar</a>
+    </div>
+  </form>
+
+  <div class="grid cols-3">
+    <div class="card kpi">
+      <div class="icon">↩️</div>
+      <div><p class="tiny muted" style="margin:0">Devuelto en el periodo</p>
+        <p class="value" style="margin:0;color:var(--red-600)">{{ totales.get('total', 0) | money }}</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">🧾</div>
+      <div><p class="tiny muted" style="margin:0">Devoluciones</p>
+        <p class="value" style="margin:0">{{ totales.get('n', 0) }}</p></div>
+    </div>
+    <div class="card kpi">
+      <div class="icon">📅</div>
+      <div><p class="tiny muted" style="margin:0">Devuelto hoy</p>
+        <p class="value" style="margin:0">{{ devuelto_hoy | money }}</p></div>
+    </div>
+  </div>
+
+  <div class="card flush">
+    {% if filas %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Fecha y hora</th><th>Recibo</th><th>Tipo</th><th>Motivo</th>
+            <th>Forma</th><th>Autorizó</th><th class="right">Importe</th>
+          </tr></thead>
+          <tbody>
+            {% for r in filas %}
+              {% set ref = ('V' if r['doc_type'] == 'SALE' else 'I') ~ '%06d' % r['doc_id'] %}
+              <tr>
+                <td class="nowrap muted">{{ r['created_at'] | fechahora_seg }}</td>
+                <td><a href="{{ url_for('refunds.index', codigo=ref) }}">{{ ref }}</a></td>
+                <td>
+                  <span class="badge {{ 'draft' if r['doc_type'] == 'SALE' else 'active' }}">
+                    {{ 'Venta' if r['doc_type'] == 'SALE' else 'Inscripción' }}
+                  </span>
+                </td>
+                <td class="small">{{ r['reason'] or '—' }}</td>
+                <td class="small">{{ metodos.get(r['payment_method'], r['payment_method']) }}</td>
+                <td class="small muted">{{ r['first_name'] }} {{ r['last_name'] }}</td>
+                <td class="right bold" style="color:var(--red-600)">−{{ r['amount'] | money }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if filas | length >= max_rows %}
+        <p class="tiny muted" style="padding:.75rem 1rem;margin:0">
+          Se muestran las {{ max_rows }} más recientes; los totales de arriba sí las incluyen todas.
+        </p>
+      {% endif %}
+    {% else %}
+      <p class="empty">No hay devoluciones para los filtros seleccionados.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import confirm_form %}
+{% from "_macros.html" import confirm_form, photo_capture %}
 {% block title %}Catálogo de productos — GymManager Lite{% endblock %}
 
 {% block content %}
@@ -14,19 +14,29 @@
 
   <div class="card stack">
     <h2>Agregar producto</h2>
-    <form method="post" action="{{ url_for('products.create') }}" enctype="multipart/form-data" class="row">
+    <form method="post" action="{{ url_for('products.create') }}" class="stack">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label class="field" style="flex:1;min-width:160px"><span>Nombre *</span>
-        <input type="text" name="name" required></label>
-      <label class="field"><span>Precio *</span>
-        <input type="number" name="price" min="1" step="any" class="w-sm" required></label>
-      <label class="field"><span>Stock</span>
-        <input type="number" name="stock" min="0" max="{{ max_stock }}" value="0" class="w-sm"></label>
-      <label class="field"><span>Categoría</span>
-        <input type="text" name="category" class="w-md"></label>
-      <label class="field"><span>Imagen</span>
-        <input type="file" name="image" accept="image/*"></label>
-      <button class="btn btn-primary">+ Agregar</button>
+      <div class="row">
+        <label class="field" style="flex:1;min-width:160px"><span>Nombre *</span>
+          <input type="text" name="name" required></label>
+        <label class="field"><span>Precio *</span>
+          <input type="number" name="price" min="1" step="any" class="w-sm" required></label>
+        <label class="field"><span>Stock</span>
+          <input type="number" name="stock" min="0" max="{{ max_stock }}" value="0" class="w-sm"></label>
+        <label class="field"><span>Categoría</span>
+          <input type="text" name="category" class="w-md"></label>
+        <button class="btn btn-primary">+ Agregar</button>
+      </div>
+
+      {# Plegado: la imagen es opcional y no debe alargar el formulario de quien solo
+         quiere dar de alta un producto deprisa. #}
+      <details class="fieldset">
+        <summary><span class="bold">Imagen del producto</span>
+          <span class="tiny muted"> — opcional, se puede encuadrar y ampliar</span></summary>
+        <div style="margin-top:.75rem">
+          {{ photo_capture(none, 'Imagen del producto', 'image_data', 'square', 'Quitar imagen') }}
+        </div>
+      </details>
     </form>
   </div>
 
@@ -34,44 +44,43 @@
     <div class="stack" style="gap:.75rem">
       {% for p in products %}
         <div class="card tight">
-          <form method="post" action="{{ url_for('products.edit', product_id=p['id']) }}"
-                enctype="multipart/form-data" class="row" style="align-items:flex-end">
+          <form method="post" action="{{ url_for('products.edit', product_id=p['id']) }}" class="stack">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-            <div style="width:64px">
-              {% if p['image'] %}
-                <img class="thumb sm" style="height:56px" src="{{ url_for('uploaded_file', filename=p['image']) }}" alt="">
-              {% else %}
-                <div class="thumb sm" style="height:56px;display:flex;align-items:center;justify-content:center">🛍️</div>
-              {% endif %}
+            <div class="row" style="align-items:flex-end">
+              <div style="width:64px">
+                {% if p['image'] %}
+                  <img class="thumb sm" style="height:56px" src="{{ url_for('uploaded_file', filename=p['image']) }}" alt="">
+                {% else %}
+                  <div class="thumb sm" style="height:56px;display:flex;align-items:center;justify-content:center">🛍️</div>
+                {% endif %}
+              </div>
+
+              <label class="field" style="flex:1;min-width:150px"><span>Nombre</span>
+                <input type="text" name="name" value="{{ p['name'] }}" required></label>
+              <label class="field"><span>Precio</span>
+                <input type="number" name="price" min="1" step="any" value="{{ p['price'] | num }}" class="w-sm" required></label>
+              <label class="field"><span>Stock</span>
+                <input type="number" name="stock" min="0" max="{{ max_stock }}" value="{{ p['stock'] }}" class="w-sm" required></label>
+              <label class="field"><span>Categoría</span>
+                <input type="text" name="category" value="{{ p['category'] or '' }}" class="w-md"></label>
+
+              <button class="btn btn-secondary">Guardar</button>
             </div>
 
-            <label class="field" style="flex:1;min-width:150px"><span>Nombre</span>
-              <input type="text" name="name" value="{{ p['name'] }}" required></label>
-            <label class="field"><span>Precio</span>
-              <input type="number" name="price" min="1" step="any" value="{{ p['price'] | num }}" class="w-sm" required></label>
-            <label class="field"><span>Stock</span>
-              <input type="number" name="stock" min="0" max="{{ max_stock }}" value="{{ p['stock'] }}" class="w-sm" required></label>
-            <label class="field"><span>Categoría</span>
-              <input type="text" name="category" value="{{ p['category'] or '' }}" class="w-md"></label>
-            <label class="field"><span>Cambiar imagen</span>
-              <input type="file" name="image" accept="image/*"></label>
-
-            <button class="btn btn-secondary">Guardar</button>
+            {# El editor va dentro del mismo formulario: la imagen se guarda con el
+               resto de los cambios, en un solo «Guardar». #}
+            <details class="fieldset">
+              <summary><span class="bold">
+                {{ 'Ajustar o cambiar la imagen' if p['image'] else 'Añadir imagen' }}</span></summary>
+              <div style="margin-top:.75rem">
+                {{ photo_capture(p['image'], 'Imagen del producto', 'image_data', 'square', 'Quitar imagen') }}
+              </div>
+            </details>
           </form>
 
           <div class="row between" style="margin-top:.6rem">
-            {% if p['image'] %}
-              <form method="post" action="{{ url_for('products.edit', product_id=p['id']) }}" class="row tight">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="name" value="{{ p['name'] }}">
-                <input type="hidden" name="price" value="{{ p['price'] }}">
-                <input type="hidden" name="stock" value="{{ p['stock'] }}">
-                <input type="hidden" name="category" value="{{ p['category'] or '' }}">
-                <input type="hidden" name="remove_image" value="1">
-                <button class="linkbtn tiny">Quitar imagen</button>
-              </form>
-            {% else %}<span></span>{% endif %}
+            <span></span>
 
             {{ confirm_form(
                 url_for('products.delete', product_id=p['id']),
@@ -87,4 +96,8 @@
     <div class="card"><p class="empty">No hay productos en el catálogo.</p></div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='photo-capture.js') }}" defer></script>
 {% endblock %}

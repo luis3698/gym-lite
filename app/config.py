@@ -46,6 +46,30 @@ INSTANCE_DIR = _resolve_instance_dir()
 UPLOAD_DIR = INSTANCE_DIR / "uploads"
 DATABASE_PATH = INSTANCE_DIR / "gym.db"
 SECRET_KEY_PATH = INSTANCE_DIR / "secret_key"
+BACKUP_DIR = INSTANCE_DIR / "backups"
+
+# --- Copias de seguridad ------------------------------------------------------
+# Cada cuánto se hace una copia automática. Se comprueba al arrancar el programa: en
+# un gimnasio el equipo se enciende por la mañana y se apaga por la noche, así que no
+# tiene sentido un temporizador que solo dispararía si alguien lo deja encendido.
+BACKUP_FREQUENCIES = {
+    "OFF": "No hacer copias automáticas",
+    "STARTUP": "Cada vez que se abre el programa",
+    "DAILY": "Una vez al día",
+    "WEEKLY": "Una vez por semana",
+    "MONTHLY": "Una vez al mes",
+}
+BACKUP_FREQUENCY_DAYS = {"STARTUP": 0, "DAILY": 1, "WEEKLY": 7, "MONTHLY": 30}
+
+# Cuántas copias se conservan. Las más viejas se van borrando solas: si no, la carpeta
+# crece sin freno hasta llenar el disco, que es justo lo que la copia debía evitar.
+DEFAULT_BACKUP_KEEP = 15
+MIN_BACKUP_KEEP = 3
+MAX_BACKUP_KEEP = 200
+
+# Tope de un archivo de copia al restaurar. Una base de un gimnasio grande con años de
+# histórico no llega a 200 MB; por encima de eso, casi seguro no es lo que se cree.
+MAX_BACKUP_UPLOAD_BYTES = 200 * 1024 * 1024
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5000
@@ -119,6 +143,13 @@ PAYMENT_METHODS = {
     "TRANSFERENCIA": "Transferencia",
 }
 VALID_PAYMENT_METHODS = tuple(PAYMENT_METHODS)
+
+# Anchos de rollo térmico habituales. 80 mm es lo normal en mostrador; 58 mm, en las
+# impresoras pequeñas portátiles.
+RECEIPT_WIDTHS = {
+    "58": "58 mm (rollo estrecho)",
+    "80": "80 mm (rollo estándar)",
+}
 
 SEX_OPTIONS = ("Masculino", "Femenino", "Otro")
 BLOOD_TYPES = ("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
@@ -201,6 +232,16 @@ ACTION_LABELS = {
     "FACE_REMOVED": "Rostro eliminado del acceso",
     "FACE_TOGGLED": "Reconocimiento facial activado o desactivado",
     "FACE_COOLDOWN_CHANGED": "Antirrebote del kiosco modificado",
+    "BUSINESS_UPDATED": "Datos del negocio actualizados",
+    "BARCODE_TOGGLED": "Códigos de barras activados o desactivados",
+    "REFUND_CREATED": "Devolución registrada",
+    "REFUND_FAILED": "Intento fallido de registrar una devolución",
+    "BACKUP_CONFIGURED": "Copias de seguridad configuradas",
+    "BACKUP_CREATED": "Copia de seguridad creada",
+    "BACKUP_DOWNLOADED": "Copia de seguridad descargada",
+    "BACKUP_DELETED": "Copia de seguridad eliminada",
+    "BACKUP_RESTORED": "Base de datos restaurada desde una copia",
+    "BACKUP_RESTORE_FAILED": "Intento fallido de restaurar la base de datos",
     "MIGRATION_MANUAL": "Socio migrado manualmente",
     "MIGRATION_IMPORT": "Socios importados desde archivo",
     "INDEX_TOGGLED": "Índice corporal activado o desactivado",

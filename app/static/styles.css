@@ -315,6 +315,11 @@ input[type="file"] { font-size: .8rem; padding: .35rem 0; border: 0; }
 .photo-capture .pc-side { display: flex; flex-direction: column; align-items: center; gap: .35rem; }
 .photo-capture .pc-main { flex: 1; min-width: 260px; }
 .photo-capture .pc-preview { background: #fff; border: 1px solid var(--slate-200); }
+/* Vista previa cuadrada, para las imágenes de producto. */
+.pc-square {
+  width: 96px; height: 96px; border-radius: 10px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
 .photo-capture .pc-preview img { width: 100%; height: 100%; object-fit: cover; }
 .photo-capture .pc-empty { font-size: .62rem; color: var(--slate-400); text-align: center; line-height: 1.2; }
 
@@ -452,6 +457,19 @@ details.confirm .panel p { margin: 0 0 .6rem; font-size: .85rem; color: var(--re
 .index-tile.bad  { background: var(--red-50);   border-color: var(--red-200); }
 .index-value { margin: .1rem 0 .35rem; font-size: 1.5rem; font-weight: 700; }
 
+/* Panel de saldo de una devolución. */
+.refund-balance {
+  background: var(--slate-50); border: 1px solid var(--slate-200);
+  border-radius: 10px; padding: .75rem .9rem; font-size: .85rem;
+}
+.refund-balance .tk-linea { padding: .15rem 0; }
+.refund-available {
+  display: flex; justify-content: space-between; align-items: baseline; gap: .75rem;
+  margin-top: .5rem; padding-top: .5rem; border-top: 1px solid var(--slate-300);
+  font-weight: 700;
+}
+.refund-available span:last-child { font-size: 1.35rem; color: var(--green-700); }
+
 .pay-tile {
   background: var(--slate-50); border: 1px solid var(--slate-200);
   border-radius: 10px; padding: .7rem .85rem;
@@ -504,7 +522,12 @@ details.confirm .panel p { margin: 0 0 .6rem; font-size: .85rem; color: var(--re
 
 /* Cuenta atrás visible: se vacía hasta que el aviso se va. */
 .kw-timer { height: 3px; background: var(--slate-200); }
-.kw-timer span { display: block; height: 100%; width: 100%; background: var(--slate-400); }
+/* El ancho lo fija el JS en cada latido a partir del tiempo real que queda; la
+   transición corta solo suaviza el salto entre un latido y el siguiente. */
+.kw-timer span {
+  display: block; height: 100%; width: 100%; background: var(--slate-400);
+  transition: width .2s linear;
+}
 .kiosk-watch[data-state="allowed"] .kw-timer span { background: var(--green-500); }
 .kiosk-watch[data-state="denied"]  .kw-timer span { background: var(--red-500); }
 
@@ -723,6 +746,75 @@ details.confirm .panel p { margin: 0 0 .6rem; font-size: .85rem; color: var(--re
   font-size: .62rem; font-weight: 700; text-transform: uppercase;
 }
 
+/* --- Recibo en papel térmico --------------------------------------------- */
+/* El ancho real lo pone `--ticket-mm` desde la plantilla (58 u 80 mm). En pantalla se
+   ve a tamaño de papel, para que lo que se ve sea lo que sale por la impresora. */
+
+.ticket {
+  --ticket-mm: 80mm;
+  width: var(--ticket-mm);
+  margin: 0 auto;
+  padding: 4mm 3mm;
+  background: #fff;
+  color: #000;
+  /* Monoespaciada: las térmicas imprimen bien pocos tipos de letra, y los importes
+     solo cuadran en columna si todos los dígitos ocupan lo mismo. */
+  font-family: "Consolas", "DejaVu Sans Mono", "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.ticket.w58 { --ticket-mm: 58mm; font-size: 10px; }
+
+.ticket p { margin: 0; }
+
+.tk-head { text-align: center; }
+.tk-negocio { font-size: 1.25em; font-weight: 700; letter-spacing: .02em; margin-bottom: .2em !important; }
+.tk-tax { margin-top: .35em !important; font-style: italic; }
+
+.tk-titulo { text-align: center; font-weight: 700; letter-spacing: .12em; margin: .3em 0 .5em !important; }
+
+/* Guiones y no un borde: el borde sale como una línea gris pálida en térmica, que
+   imprime en blanco y negro puro. */
+.tk-sep { border-top: 1px dashed #000; margin: .45em 0; }
+.tk-sep.tk-doble { border-top-style: solid; }
+
+.tk-linea { display: flex; justify-content: space-between; gap: .5em; }
+.tk-linea > span:last-child { text-align: right; }
+
+.tk-item { display: flex; justify-content: space-between; gap: .5em; align-items: baseline; }
+.tk-item .tk-concepto { flex: 1; min-width: 0; }
+.tk-item .tk-importe { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tk-item.tk-sub { padding-left: 1em; }
+
+.tk-total {
+  display: flex; justify-content: space-between; gap: .5em;
+  font-size: 1.25em; font-weight: 700;
+  border-top: 1px solid #000; border-bottom: 1px solid #000;
+  padding: .25em 0; margin: .35em 0 .45em;
+}
+
+.tk-pie { text-align: center; margin-top: .3em; }
+.tk-pie p { margin: .1em 0 !important; }
+
+.tk-barcode { text-align: center; margin-top: .7em; }
+.tk-barcode svg { max-width: 100%; height: auto; }
+.tk-barcode-nota { text-align: center; font-size: .85em; margin-top: .15em !important; }
+
+.tk-corte { text-align: center; margin-top: .8em !important; letter-spacing: .1em; }
+
+/* Ejemplo del código en la pantalla de ajustes, sobre papel blanco. */
+.barcode-sample {
+  margin-top: .8rem; padding: .6rem; background: #fff; border-radius: 8px;
+  border: 1px solid var(--slate-200); display: inline-block;
+}
+
+/* Vista en pantalla: se dibuja como un papel sobre la mesa. */
+.ticket-preview {
+  background: var(--slate-200); padding: 1.25rem; border-radius: 12px;
+  display: flex; justify-content: center;
+}
+.ticket-preview .ticket { box-shadow: 0 2px 8px rgb(15 23 42 / 20%); }
+
 /* --- Impresión: solo el recibo ------------------------------------------- */
 
 @media print {
@@ -730,7 +822,16 @@ details.confirm .panel p { margin: 0 0 .6rem; font-size: .85rem; color: var(--re
   body { background: #fff; }
   main { padding: 0; }
   .card { box-shadow: none; border: 0; }
-  .receipt { border: 0; }
   .print-only { display: block !important; }
+
+  /* El rollo no tiene páginas: el alto es el del contenido y no debe quedar margen,
+     porque el papel ya viene con el suyo y cualquier margen extra descuadra el ancho. */
+  .ticket-preview { background: none; padding: 0; display: block; }
+  .ticket { width: auto; margin: 0; padding: 0 1mm; box-shadow: none; }
 }
+
+/* El tamaño de página tiene que declararse fuera de la consulta de medios para que el
+   navegador lo tome; se define por ancho de rollo. */
+@page { margin: 0; }
+
 .print-only { display: none; }

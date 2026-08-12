@@ -39,6 +39,9 @@
     var view = { scale: 1, minScale: 1, x: 0, y: 0 };
     var drag = null;
     var ctx = el.canvas.getContext("2d");
+    // Forma del encuadre. El recorte guardado siempre es cuadrado; lo que cambia es la
+    // guía que se dibuja y cómo se recorta después al mostrarlo (CSS).
+    var cuadrado = root.dataset.pcShape === "square";
 
     el.canvas.width = STAGE;
     el.canvas.height = STAGE;
@@ -165,17 +168,29 @@
       clampView();
       paint(ctx, STAGE);
 
-      // Guía circular: oscurece lo que quedará fuera del encuadre del rostro.
+      // Guía del encuadre: oscurece lo que quedará fuera. Redonda para las fotos de
+      // personas (se muestran en avatares circulares) y cuadrada para las de producto,
+      // que se ven en fichas rectangulares.
+      var margen = 6;
       ctx.save();
       ctx.fillStyle = "rgba(15, 23, 42, 0.55)";
       ctx.beginPath();
       ctx.rect(0, 0, STAGE, STAGE);
-      ctx.arc(STAGE / 2, STAGE / 2, STAGE / 2 - 6, 0, Math.PI * 2, true);
+      if (cuadrado) {
+        ctx.rect(STAGE - margen, margen, -(STAGE - margen * 2), STAGE - margen * 2);
+      } else {
+        ctx.arc(STAGE / 2, STAGE / 2, STAGE / 2 - margen, 0, Math.PI * 2, true);
+      }
       ctx.fill("evenodd");
+
       ctx.strokeStyle = "rgba(255,255,255,.9)";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(STAGE / 2, STAGE / 2, STAGE / 2 - 6, 0, Math.PI * 2);
+      if (cuadrado) {
+        ctx.rect(margen, margen, STAGE - margen * 2, STAGE - margen * 2);
+      } else {
+        ctx.arc(STAGE / 2, STAGE / 2, STAGE / 2 - margen, 0, Math.PI * 2);
+      }
       ctx.stroke();
       ctx.restore();
     }

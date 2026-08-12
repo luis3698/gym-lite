@@ -1,0 +1,97 @@
+{# Recibo en papel térmico, compartido por ventas e inscripciones.
+
+   El ancho lo fija `.ticket` desde el CSS (58 u 80 mm) y la impresión usa `@page` con
+   ese mismo ancho y alto automático: el rollo no tiene páginas, se corta donde termina
+   el contenido.
+
+   Se usa fuente monoespaciada a propósito. Las impresoras térmicas imprimen bien pocos
+   tipos de letra y los importes cuadran en columna solo si todos los dígitos ocupan lo
+   mismo.
+
+   Parámetros:
+     titulo    — «RECIBO DE VENTA» / «RECIBO DE INSCRIPCIÓN»
+     numero    — V-000123
+     fecha     — texto ya formateado
+     persona   — (nombre, documento) del cliente
+     atendido  — quién lo despachó
+     lineas    — [(concepto, importe_formateado, es_secundaria)]
+     total     — importe formateado
+     pago      — método de pago
+     extras    — [(etiqueta, valor)] que se imprimen antes del total
+     barcode   — SVG del código de barras, o none si están desactivados
+#}
+{% macro ticket(negocio, titulo, numero, fecha, persona, atendido, lineas, total, pago, extras=[], barcode=none) %}
+<div class="ticket {{ 'w58' if negocio.width == '58' }}">
+
+  {# --- Cabecera del establecimiento --- #}
+  <div class="tk-head">
+    <p class="tk-negocio">{{ negocio.name }}</p>
+    {% if negocio.nit %}<p>NIT {{ negocio.nit }}</p>{% endif %}
+    {% if negocio.address %}<p>{{ negocio.address }}</p>{% endif %}
+    {% if negocio.city %}<p>{{ negocio.city }}</p>{% endif %}
+    {% if negocio.phone %}<p>Tel. {{ negocio.phone }}</p>{% endif %}
+    {% if negocio.email %}<p>{{ negocio.email }}</p>{% endif %}
+    {% if negocio.extra %}<p>{{ negocio.extra }}</p>{% endif %}
+    {% if negocio.tax_note %}<p class="tk-tax">{{ negocio.tax_note }}</p>{% endif %}
+  </div>
+
+  <div class="tk-sep"></div>
+
+  <p class="tk-titulo">{{ titulo }}</p>
+  <div class="tk-linea"><span>N.º</span><span>{{ numero }}</span></div>
+  <div class="tk-linea"><span>Fecha</span><span>{{ fecha }}</span></div>
+  {% if atendido %}
+    <div class="tk-linea"><span>Atendió</span><span>{{ atendido }}</span></div>
+  {% endif %}
+
+  <div class="tk-sep"></div>
+
+  {# --- Cliente --- #}
+  <div class="tk-linea"><span>Cliente</span><span>{{ persona[0] }}</span></div>
+  {% if persona[1] %}
+    <div class="tk-linea"><span>Documento</span><span>{{ persona[1] }}</span></div>
+  {% endif %}
+  {% if persona | length > 2 and persona[2] %}
+    <div class="tk-linea"><span>Teléfono</span><span>{{ persona[2] }}</span></div>
+  {% endif %}
+
+  <div class="tk-sep tk-doble"></div>
+
+  {# --- Detalle --- #}
+  {% for concepto, importe, secundaria in lineas %}
+    <div class="tk-item {{ 'tk-sub' if secundaria }}">
+      <span class="tk-concepto">{{ concepto }}</span>
+      <span class="tk-importe">{{ importe }}</span>
+    </div>
+  {% endfor %}
+
+  <div class="tk-sep"></div>
+
+  {% for etiqueta, valor in extras %}
+    <div class="tk-linea"><span>{{ etiqueta }}</span><span>{{ valor }}</span></div>
+  {% endfor %}
+
+  <div class="tk-total">
+    <span>TOTAL</span><span>{{ total }}</span>
+  </div>
+
+  <div class="tk-linea"><span>Forma de pago</span><span>{{ pago }}</span></div>
+
+  {% if negocio.footer %}
+    <div class="tk-sep"></div>
+    <div class="tk-pie">
+      {% for renglon in negocio.footer.split('\n') %}
+        {% if renglon.strip() %}<p>{{ renglon.strip() }}</p>{% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {# El código va al final, donde es cómodo apoyar el lector sin doblar el papel. #}
+  {% if barcode %}
+    <div class="tk-barcode">{{ barcode | safe }}</div>
+    <p class="tk-barcode-nota">Presente este recibo para cambios o devoluciones</p>
+  {% endif %}
+
+  <p class="tk-corte">· · · · · · · · · · · · · · · ·</p>
+</div>
+{% endmacro %}

@@ -75,6 +75,91 @@ respectivos módulos.
 
 ---
 
+## Copias de seguridad
+
+Todo el gimnasio vive en un único archivo. **Esto es lo primero que debería configurar.**
+
+En **Administración → Copias de seguridad** elija cada cuánto se hace la copia (por
+defecto, una al día al abrir el programa) y cuántas conservar. Las más antiguas se
+borran solas para no llenar el disco. También puede crear una a mano cuando quiera.
+
+### Si pierde la base de datos
+
+En esa misma pantalla, **suba el archivo `.db`** que tenga guardado y pulse Restaurar.
+Antes de sustituir nada, el programa:
+
+1. Comprueba que el archivo es realmente una copia de GymManager Lite.
+2. Guarda una copia del estado actual, por si la restauración era un error.
+3. Le pide su contraseña.
+
+Después tendrá que cerrar sesión y volver a entrar.
+
+> **Importante.** Las copias se guardan en la carpeta `data\backups` del propio equipo.
+> Eso no protege de que ese disco falle: **copie esa carpeta de vez en cuando a un USB o
+> a la nube**. Y recuerde que las fotos de clientes y las imágenes de productos son
+> archivos aparte, en `data\uploads`: si va a mudar el programa a otro equipo, lleve
+> también esa carpeta.
+
+---
+
+## Recibos en papel térmico
+
+Los recibos salen en formato de **tiquete de caja**, para impresora térmica de 58 u
+80 mm. Al pulsar «Imprimir» se abre el diálogo del navegador, donde puede elegir la
+impresora térmica o guardar en PDF.
+
+En **Administración → Datos del negocio** se rellena lo que se imprime en cada recibo:
+nombre del establecimiento, NIT, dirección, teléfonos, correo, redes, nota tributaria y
+el pie con las leyendas legales. La pantalla muestra **una vista previa a tamaño real**:
+lo que ve ahí es lo que sale por la impresora.
+
+Viene con un ejemplo relleno para que se vea qué va en cada sitio. Sustitúyalo por los
+datos de su gimnasio.
+
+> El programa **imprime lo que usted escriba**: no valida el NIT ni asigna numeración
+> fiscal. Si su gimnasio factura electrónicamente o tiene resolución de la DIAN, ponga
+> en la nota tributaria y en el pie los textos que le correspondan.
+
+---
+
+## Devoluciones
+
+Cada recibo se imprime con un **código de barras**. Para devolver, entre en
+**Devoluciones**, pase el lector por el código —o escriba la referencia, que va impresa
+debajo— y aparecerá la compra con:
+
+- lo que se cobró,
+- lo que ya se ha devuelto,
+- y el **saldo devolvible** que queda.
+
+Escriba cuánto se devuelve. Puede ser **todo o una parte**, y se puede devolver varias
+veces hasta agotar el saldo. Mientras escribe, el programa avisa si el importe se pasa y
+no deja registrarlo. El motivo es obligatorio: es lo que explica después por qué la caja
+no cuadra con lo vendido.
+
+> **Qué no hace.** Devolver el dinero de una inscripción **no la cancela**: si además
+> quiere que el socio deje de tener acceso, cancélela desde su ficha. Son dos cosas
+> distintas a propósito, porque una devolución parcial no debería quitarle el acceso.
+
+Cada devolución queda guardada con su importe, motivo, forma de pago, fecha y **quién la
+autorizó**. El recibo original nunca se modifica ni se borra. En
+**Devoluciones → Ver histórico** están todas, con filtros por tipo, forma de pago, fecha
+y motivo.
+
+### En ventas e ingresos
+
+Las devoluciones aparecen en el informe **en negativo**, así que el total que ve es el
+**neto**: lo cobrado menos lo devuelto. La tarjeta de arriba muestra las dos cifras, y el
+CSV exporta el desglose completo y el total neto.
+
+### Desactivar los códigos de barras
+
+En **Datos del negocio → Código de barras en los recibos** se puede apagar, **escribiendo
+su contraseña**. Los recibos ya impresos siguen funcionando: solo dejan de imprimirse los
+nuevos, y se pueden seguir leyendo para devoluciones.
+
+---
+
 ## Pausar una inscripción
 
 Cuando un socio se va de viaje, se lesiona o quiere congelar su mensualidad, entre en

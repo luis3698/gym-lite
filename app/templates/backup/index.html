@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% from "_macros.html" import confirm_form %}
+{% block title %}Copias de seguridad — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Copias de seguridad</h1>
+    <p class="muted">
+      Todo el gimnasio vive en un único archivo. Esto es lo que lo protege.
+    </p>
+  </div>
+
+  {% if frecuencia == 'OFF' %}
+    <div class="flash warning">
+      Las copias automáticas están <strong>desactivadas</strong>. Si el disco falla o el
+      archivo se borra, se pierden clientes, inscripciones y ventas sin vuelta atrás.
+    </div>
+  {% elif dias_desde_ultima is none %}
+    <div class="flash info">
+      Todavía no se ha hecho ninguna copia automática. Se hará la próxima vez que se abra
+      el programa; también puede crear una ahora mismo.
+    </div>
+  {% elif dias_desde_ultima > 8 %}
+    <div class="flash warning">
+      La última copia automática es de hace <strong>{{ dias_desde_ultima | round | int }} día(s)</strong>.
+      Compruebe que el programa se está abriendo con normalidad.
+    </div>
+  {% endif %}
+
+  {# --- Configuración ------------------------------------------------------- #}
+  <div class="card">
+    <h2 style="margin:0 0 .3rem">Cada cuánto copiar</h2>
+    <p class="tiny muted" style="margin:0 0 .9rem">
+      La copia se hace al abrir el programa, cuando toca según la frecuencia elegida. En
+      un gimnasio el equipo se enciende por la mañana, así que basta con eso: no hace
+      falta dejarlo encendido para que se cumpla.
+    </p>
+
+    <form method="post" action="{{ url_for('backup.configure') }}" class="row" style="align-items:flex-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <label class="field" style="min-width:260px">
+        <span>Frecuencia</span>
+        <select name="frequency">
+          {% for key, label in frecuencias.items() %}
+            <option value="{{ key }}" {{ 'selected' if frecuencia == key }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Copias a conservar</span>
+        <input type="number" name="keep" class="w-sm" required
+               min="{{ min_conservar }}" max="{{ max_conservar }}" value="{{ conservar }}">
+      </label>
+
+      <button class="btn btn-primary">Guardar</button>
+      <span class="tiny muted">Las más antiguas se borran solas para no llenar el disco.</span>
+    </form>
+
+    <p class="tiny muted" style="margin:.9rem 0 0">
+      Se guardan en <code>{{ carpeta }}</code>.
+      Conviene copiar de vez en cuando esa carpeta a un USB o a la nube: una copia en el
+      mismo disco no protege de que ese disco falle.
+    </p>
+  </div>
+
+  {# --- Copias existentes --------------------------------------------------- #}
+  <div class="card flush">
+    <div class="row between" style="padding:1.15rem 1.15rem .5rem">
+      <div>
+        <h2 style="margin:0">Copias guardadas</h2>
+        <p class="tiny muted" style="margin:.2rem 0 0">
+          {{ copias | length }} copia(s) · {{ (total_bytes / 1048576) | round(1) }} MB en total
+        </p>
+      </div>
+      <form method="post" action="{{ url_for('backup.create_now') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-primary btn-sm">💾 Crear copia ahora</button>
+      </form>
+    </div>
+
+    {% if copias %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Archivo</th><th>Fecha</th><th class="right">Tamaño</th><th>Origen</th><th></th>
+          </tr></thead>
+          <tbody>
+            {% for c in copias %}
+              <tr>
+                <td class="small">{{ c.name }}</td>
+                <td class="nowrap muted">{{ c.created.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td class="right nowrap">{{ (c.size / 1048576) | round(2) }} MB</td>
+                <td>
+                  {% if c.safety %}
+                    <span class="badge draft">Previa a restaurar</span>
+                  {% elif c.auto %}
+                    <span class="badge active">Automática</span>
+                  {% else %}
+                    <span class="badge none">Manual</span>
+                  {% endif %}
+                </td>
+                <td class="right nowrap">
+                  <div class="row tight" style="justify-content:flex-end">
+                    <a class="small" href="{{ url_for('backup.download', name=c.name) }}">Descargar</a>
+
+                    <details class="confirm">
+                      <summary class="linkbtn tiny">Restaurar</summary>
+                      <div class="panel">
+                        <p>
+                          Se sustituirán <strong>todos</strong> los datos actuales por los de
+                          esta copia del {{ c.created.strftime('%d/%m/%Y %H:%M') }}.
+                          Antes se guardará una copia del estado de ahora.
+                        </p>
+                        <form method="post" action="{{ url_for('backup.restore_existing', name=c.name) }}">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                          <label class="field" style="margin-bottom:.6rem">
+                            <span>Escriba su contraseña para confirmar</span>
+                            <input type="password" name="password" autocomplete="current-password" required>
+                          </label>
+                          <button class="btn btn-danger btn-sm">Sí, restaurar esta copia</button>
+                        </form>
+                      </div>
+                    </details>
+
+                    {{ confirm_form(
+                        url_for('backup.delete', name=c.name),
+                        'Se eliminará el archivo «' ~ c.name ~ '». Esta acción no se puede deshacer.',
+                        'Sí, eliminar',
+                        'Eliminar',
+                        extra_class='linkbtn danger tiny'
+                    ) }}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty">Todavía no hay ninguna copia.</p>
+    {% endif %}
+  </div>
+
+  {# --- Restaurar desde archivo --------------------------------------------- #}
+  <div class="card">
+    <h2 style="margin:0 0 .3rem">Restaurar desde un archivo</h2>
+    <p class="tiny muted" style="margin:0 0 .9rem">
+      Si perdió la base de datos y tiene una copia guardada fuera (USB, nube, otro
+      equipo), súbala aquí. Antes de sustituir nada se comprueba que el archivo es
+      realmente una base de este programa y se guarda una copia del estado actual.
+    </p>
+
+    <form method="post" action="{{ url_for('backup.restore_upload') }}"
+          enctype="multipart/form-data" class="row" style="align-items:flex-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="field" style="flex:1;min-width:220px">
+        <span>Archivo de copia (.db)</span>
+        <input type="file" name="archivo" accept=".db" required>
+      </label>
+      <label class="field" style="min-width:200px">
+        <span>Su contraseña</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn btn-danger">Restaurar</button>
+    </form>
+  </div>
+
+  <div class="notice">
+    <strong>Qué pasa al restaurar.</strong> Es una sustitución completa: TODO el contenido
+    de la base vuelve a como estaba en la copia —clientes, inscripciones, ventas,
+    productos, devoluciones, rostros, ajustes y registro de actividad—, no solo una
+    parte. Las fotos de los clientes
+    y las imágenes de los productos <strong>no</strong> están dentro de la base —son
+    archivos aparte en la carpeta <code>uploads</code>—, así que si restaura en un equipo
+    distinto conviene copiar también esa carpeta.
+    <br><br>
+    Después de restaurar tendrá que cerrar sesión y volver a entrar, porque su sesión
+    pertenece a la base anterior.
+  </div>
+</div>
+{% endblock %}

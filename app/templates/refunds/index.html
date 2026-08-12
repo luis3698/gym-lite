@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Devoluciones — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div>
+      <h1>Devoluciones</h1>
+      <p class="muted">Lea el código de barras del recibo o escriba su referencia.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('refunds.history') }}">Ver histórico</a>
+  </div>
+
+  {# --- Lectura del código --- #}
+  <form class="card" method="get" data-scan-form>
+    <div class="row">
+      <label class="field" style="flex:1;min-width:240px">
+        <span>Referencia del recibo</span>
+        {# autofocus: el lector de códigos escribe como un teclado, así que el cursor
+           tiene que estar ya aquí para que no haya que hacer clic antes de leer. #}
+        <input type="search" name="codigo" value="{{ codigo }}" autofocus
+               placeholder="V000123 o I000045" autocomplete="off" data-scan-input>
+        <span class="tiny muted">
+          Está impresa bajo el código de barras. El lector la escribe solo y confirma.
+        </span>
+      </label>
+      <button class="btn btn-primary">Buscar recibo</button>
+      {% if codigo %}
+        <a class="btn btn-secondary" href="{{ url_for('refunds.index') }}">Limpiar</a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if error %}
+    <div class="flash error">{{ error }}</div>
+  {% endif %}
+
+  {# --- El recibo encontrado --- #}
+  {% if documento %}
+    <div class="grid" style="grid-template-columns: minmax(0,1fr) minmax(320px,.8fr); align-items:start">
+
+      <div class="card stack">
+        <div class="row between">
+          <div>
+            <h2 style="margin:0">{{ documento.title }}</h2>
+            <p class="tiny muted" style="margin:.2rem 0 0">
+              {{ documento.reference }} · {{ documento.created_at }}
+            </p>
+          </div>
+          <span class="badge {{ 'fail' if documento.available <= 0 else 'ok' }}">
+            {{ 'Devuelto por completo' if documento.available <= 0 else 'Con saldo' }}
+          </span>
+        </div>
+
+        <div class="deflist">
+          <div><span class="k">Cliente</span><span class="v">{{ documento.person }}</span></div>
+          <div><span class="k">Documento</span><span class="v">{{ documento.document or '—' }}</span></div>
+          <div><span class="k">Atendió</span><span class="v">{{ documento.staff }}</span></div>
+          <div><span class="k">Forma de pago</span>
+            <span class="v">{{ PAYMENT_METHODS.get(documento.payment_method, documento.payment_method) }}</span></div>
+        </div>
+
+        <div>
+          <p class="small bold" style="margin:0 0 .4rem">Detalle de la compra</p>
+          <table>
+            <tbody>
+              {% for linea in documento.lines %}
+                <tr><td>{{ linea.concepto }}</td><td class="right">{{ linea.importe | money }}</td></tr>
+              {% endfor %}
+              <tr><td class="bold">Total cobrado</td>
+                  <td class="right bold">{{ documento.total | money }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        {% if documento.is_migrated %}
+          <div class="flash warning" style="margin:0">
+            Esta inscripción se cargó desde «Migración de datos» con importe cero: se
+            cobró antes de usar el programa, así que aquí no hay nada que devolver.
+          </div>
+        {% endif %}
+
+        {% if documento.history %}
+          <div>
+            <p class="small bold" style="margin:0 0 .4rem">
+              Devoluciones ya registradas ({{ documento.history | length }})
+            </p>
+            <div class="table-wrap" style="max-height:none">
+              <table>
+                <thead><tr><th>Fecha</th><th>Motivo</th><th>Quién</th><th class="right">Importe</th></tr></thead>
+                <tbody>
+                  {% for h in documento.history %}
+                    <tr>
+                      <td class="nowrap muted small">{{ h['created_at'] | fechahora }}</td>
+                      <td class="small">{{ h['reason'] or '—' }}</td>
+                      <td class="small muted">{{ h['first_name'] }} {{ h['last_name'] }}</td>
+                      <td class="right bold" style="color:var(--red-600)">−{{ h['amount'] | money }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      {# --- Registrar la devolución --- #}
+      <div class="card stack" data-refund-panel
+           data-balance-url="{{ url_for('refunds.balance', code=documento.reference) }}"
+           data-available="{{ documento.available }}">
+
+        <h2 style="margin:0">Registrar devolución</h2>
+
+        <div class="refund-balance">
+          <div class="tk-linea"><span>Total cobrado</span><span>{{ documento.total | money }}</span></div>
+          <div class="tk-linea"><span>Ya devuelto</span>
+            <span data-refunded>{{ documento.refunded | money }}</span></div>
+          <div class="refund-available">
+            <span>Saldo devolvible</span>
+            <span data-available-label>{{ documento.available | money }}</span>
+          </div>
+        </div>
+
+        {% if documento.available > 0 %}
+          <form method="post" action="{{ url_for('refunds.create') }}" class="stack" data-refund-form>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="reference" value="{{ documento.reference }}">
+
+            <label class="field">
+              <span>Importe a devolver *</span>
+              <input type="number" name="amount" step="0.01" min="0.01"
+                     max="{{ documento.available }}" required data-amount autocomplete="off">
+              <span class="tiny" data-amount-msg></span>
+            </label>
+
+            <div class="row tight">
+              <button type="button" class="btn btn-secondary btn-sm" data-fill-all>
+                Devolver todo ({{ documento.available | money }})
+              </button>
+            </div>
+
+            <label class="field">
+              <span>Forma de devolución</span>
+              <select name="payment_method">
+                {% for key, label in PAYMENT_METHODS.items() %}
+                  <option value="{{ key }}" {{ 'selected' if documento.payment_method == key }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Motivo *</span>
+              <input type="text" name="reason" required maxlength="200"
+                     placeholder="Producto en mal estado, cobro duplicado…">
+            </label>
+
+            <button class="btn btn-danger btn-block" data-submit>Registrar devolución</button>
+            <p class="tiny muted" style="margin:0">
+              Queda registrada a su nombre y no se puede deshacer. El recibo original no
+              se modifica.
+            </p>
+          </form>
+        {% else %}
+          <p class="empty" style="padding:1rem 0">
+            No queda saldo por devolver en este recibo.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {# --- Últimas devoluciones --- #}
+  {% if recientes and not documento %}
+    <div class="card flush">
+      <div style="padding:1.15rem 1.15rem .5rem"><h2 style="margin:0">Últimas devoluciones</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Recibo</th><th>Motivo</th><th>Quién</th><th class="right">Importe</th></tr></thead>
+          <tbody>
+            {% for r in recientes %}
+              <tr>
+                <td class="nowrap muted">{{ r['created_at'] | fechahora }}</td>
+                <td>
+                  <a href="{{ url_for('refunds.index', codigo=('V' if r['doc_type'] == 'SALE' else 'I') ~ '%06d' % r['doc_id']) }}">
+                    {{ 'V' if r['doc_type'] == 'SALE' else 'I' }}{{ '%06d' % r['doc_id'] }}
+                  </a>
+                </td>
+                <td class="small">{{ r['reason'] or '—' }}</td>
+                <td class="small muted">{{ r['first_name'] }} {{ r['last_name'] }}</td>
+                <td class="right bold" style="color:var(--red-600)">−{{ r['amount'] | money }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='refunds.js') }}" defer></script>
+{% endblock %}

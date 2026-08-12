@@ -8,7 +8,7 @@ from ..config import MAX_STOCK
 from ..db import execute, insert, query_all, query_one
 from ..helpers import InvalidNumber, now_str, optional_string, parse_optional_int, parse_price
 from ..security import audit, roles_required
-from ..uploads import UploadError, delete_image, resolve_photo, save_image
+from ..uploads import UploadError, delete_image, resolve_captured_photo
 
 bp = Blueprint("products", __name__, url_prefix="/productos")
 
@@ -32,7 +32,8 @@ def create():
             raise ValueError("El producto requiere un nombre.")
         price = parse_price(request.form.get("price"), field="El precio")
         stock = parse_optional_int(request.form.get("stock"), minimum=0, maximum=MAX_STOCK) or 0
-        image = save_image(request.files.get("image"))
+        # La imagen llega del editor del navegador como data URL, ya recortada.
+        image, _ = resolve_captured_photo(None, request.form.get("image_data"))
 
         insert(
             "INSERT INTO products (name, price, stock, category, image, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -62,8 +63,8 @@ def edit(product_id: int):
         stock = parse_optional_int(request.form.get("stock"), minimum=0, maximum=MAX_STOCK)
         if stock is None:
             raise ValueError("El stock debe ser un número entero mayor o igual a cero.")
-        image, to_delete = resolve_photo(
-            product["image"], request.files.get("image"), request.form.get("remove_image")
+        image, to_delete = resolve_captured_photo(
+            product["image"], request.form.get("image_data")
         )
 
         execute(

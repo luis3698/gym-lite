@@ -10,49 +10,25 @@
   </div>
 {% endmacro %}
 
-{# Campo de imagen: vista previa, selector y casilla para quitarla. #}
-{% macro image_field(current, label='Foto', field='photo', remove_field='remove_photo', round=true) %}
-  <div class="row" style="align-items:center">
-    <div class="{{ 'avatar lg' if round else '' }}" {% if not round %}style="width:92px"{% endif %}>
-      {% if current %}
-        <img src="{{ url_for('uploaded_file', filename=current) }}" alt=""
-             class="{{ '' if round else 'thumb sm' }}"
-             {% if round %}style="width:100%;height:100%;object-fit:cover"{% endif %}>
-      {% elif round %}?{% else %}
-        <div class="thumb sm" style="display:flex;align-items:center;justify-content:center;color:var(--slate-400)">?</div>
-      {% endif %}
-    </div>
-    <div>
-      <label class="field">
-        <span>{{ label }}</span>
-        <input type="file" name="{{ field }}" accept="image/*">
-      </label>
-      {% if current %}
-        <label class="checkline" style="margin-top:.35rem">
-          <input type="checkbox" name="{{ remove_field }}" value="1"> Quitar la imagen actual
-        </label>
-      {% endif %}
-    </div>
-  </div>
-{% endmacro %}
-
 {# Toma de foto con la cámara + editor para centrar el rostro.
    La lógica está en static/photo-capture.js; el resultado viaja en el campo oculto
    `photo_data` como data URL y lo decodifica el servidor. #}
-{% macro photo_capture(current, label='Foto', name='photo_data') %}
-  <div class="photo-capture" data-photo-capture>
+{# `shape` cambia solo el encuadre: 'round' para personas (se ven en avatares
+   circulares) y 'square' para productos (se ven en fichas rectangulares). #}
+{% macro photo_capture(current, label='Foto', name='photo_data', shape='round', remove_label='Quitar foto') %}
+  <div class="photo-capture" data-photo-capture data-pc-shape="{{ shape }}">
     <input type="hidden" name="{{ name }}" value="" data-pc-input>
 
     <div class="pc-side">
-      <div class="pc-preview avatar lg" data-pc-preview>
+      <div class="pc-preview {{ 'pc-square' if shape == 'square' else 'avatar lg' }}" data-pc-preview>
         {% if current %}
           <img src="{{ url_for('uploaded_file', filename=current) }}" alt="">
         {% else %}
-          <span class="pc-empty">Sin foto</span>
+          <span class="pc-empty">Sin imagen</span>
         {% endif %}
       </div>
       <button type="button" class="linkbtn danger tiny" data-pc-action="clear"
-              {{ 'hidden' if not current }}>Quitar foto</button>
+              {{ 'hidden' if not current }}>{{ remove_label }}</button>
     </div>
 
     <div class="pc-main">
@@ -89,7 +65,8 @@
           <canvas data-pc-canvas></canvas>
         </div>
         <p class="tiny muted" style="margin:.4rem 0 .2rem">
-          Arrastre la imagen para centrar el rostro dentro del círculo y ajuste el acercamiento.
+          Arrastre la imagen para encuadrarla dentro
+          {{ 'del recuadro' if shape == 'square' else 'del círculo' }} y ajuste el acercamiento.
         </p>
         <label class="checkline" style="gap:.6rem">
           <span class="tiny">Zoom</span>

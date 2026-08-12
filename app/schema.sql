@@ -181,6 +181,30 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TEXT    NOT NULL
 );
 
+-- Devoluciones de dinero sobre un recibo ya emitido.
+--
+-- No se modifica ni se borra nunca el recibo original: cada devolución es una fila
+-- aparte que apunta a él. Así queda el rastro completo de qué se cobró, cuándo se
+-- devolvió, cuánto y quién lo autorizó —que es justo lo que hace falta cuando alguien
+-- pregunta por qué la caja no cuadra—.
+--
+-- El saldo devolvible de un recibo es su total menos la suma de sus devoluciones. No se
+-- guarda en ninguna columna a propósito: un saldo almacenado se desincroniza en cuanto
+-- una escritura falla a medias, mientras que la suma siempre dice la verdad.
+--
+-- `doc_type` distingue a qué apunta porque las ventas y las inscripciones son tablas
+-- distintas y ambas emiten recibo.
+CREATE TABLE IF NOT EXISTS refunds (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_type       TEXT    NOT NULL CHECK (doc_type IN ('SALE', 'MEMBERSHIP')),
+    doc_id         INTEGER NOT NULL,
+    amount         REAL    NOT NULL CHECK (amount > 0),
+    reason         TEXT,
+    payment_method TEXT    NOT NULL DEFAULT 'EFECTIVO',
+    created_by_id  INTEGER NOT NULL REFERENCES users(id),
+    created_at     TEXT    NOT NULL
+);
+
 -- Ajustes que el administrador puede cambiar desde la aplicación, en formato
 -- clave/valor: son pocos y no merecen una columna cada uno. Los valores se guardan
 -- como texto ('1'/'0' para los interruptores) y siempre se leen con un valor por
@@ -270,6 +294,10 @@ CREATE INDEX IF NOT EXISTS idx_audit_created        ON audit_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_user           ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_client_faces_client  ON client_faces(client_id);
 CREATE INDEX IF NOT EXISTS idx_index_ranges_code    ON index_ranges(index_code, sort_order);
+-- El saldo devolvible se calcula sumando las devoluciones de un recibo concreto, y eso
+-- se consulta en cada lectura del código de barras.
+CREATE INDEX IF NOT EXISTS idx_refunds_doc           ON refunds(doc_type, doc_id);
+CREATE INDEX IF NOT EXISTS idx_refunds_created       ON refunds(created_at);
 CREATE INDEX IF NOT EXISTS idx_access_logs_created  ON access_logs(created_at);
 -- El antirrebote busca «último paso de este cliente», así que ordena por fecha
 -- dentro de un cliente concreto: el índice compuesto lo resuelve sin recorrer nada.

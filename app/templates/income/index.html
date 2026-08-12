@@ -7,8 +7,8 @@
     <h1>Registro de ventas e ingresos</h1>
     <p class="muted">
       Todo el dinero que entra al gimnasio: inscripciones y venta de productos, en una
-      sola lista. Las inscripciones cargadas desde «Migración de datos» no aparecen aquí,
-      porque se cobraron antes de usar el programa.
+      sola lista, con las devoluciones restando. Las inscripciones cargadas desde
+      «Migración de datos» no aparecen: se cobraron antes de usar el programa.
     </p>
   </div>
 
@@ -59,9 +59,12 @@
   <div class="grid cols-4">
     <div class="card kpi">
       <div class="icon">💰</div>
-      <div><p class="tiny muted" style="margin:0">Total del periodo</p>
+      <div><p class="tiny muted" style="margin:0">Neto del periodo</p>
         <p class="value" style="margin:0;color:var(--green-600)">{{ totals.get('total', 0) | money }}</p>
-        <p class="tiny muted" style="margin:0">{{ totals.get('movimientos', 0) }} movimiento(s)</p></div>
+        <p class="tiny muted" style="margin:0">
+          {{ totals.get('bruto', 0) | money }} cobrado
+          {%- if totals.get('devuelto', 0) %} − {{ totals.get('devuelto', 0) | money }} devuelto{% endif %}
+        </p></div>
     </div>
     <div class="card kpi">
       <div class="icon">📅</div>
@@ -76,10 +79,11 @@
         <p class="tiny muted" style="margin:0">{{ totals.get('n_sales', 0) }} venta(s)</p></div>
     </div>
     <div class="card kpi">
-      <div class="icon">📊</div>
-      <div><p class="tiny muted" style="margin:0">Promedio por movimiento</p>
-        <p class="value" style="margin:0">{{ totals.get('promedio', 0) | money }}</p>
-        <p class="tiny muted" style="margin:0">sobre lo filtrado</p></div>
+      <div class="icon">↩️</div>
+      <div><p class="tiny muted" style="margin:0">Devoluciones</p>
+        <p class="value" style="margin:0;color:{{ 'var(--red-600)' if totals.get('devuelto', 0) else 'var(--slate-400)' }}">
+          −{{ totals.get('devuelto', 0) | money }}</p>
+        <p class="tiny muted" style="margin:0">{{ totals.get('n_refunds', 0) }} devolución(es)</p></div>
     </div>
   </div>
 
@@ -113,7 +117,7 @@
               <tr>
                 <td class="nowrap muted">{{ r['created_at'] | fechahora_seg }}</td>
                 <td>
-                  <span class="badge {{ 'active' if r['kind'] == 'MEMBERSHIP' else 'draft' }}">
+                  <span class="badge {{ {'MEMBERSHIP':'active','SALE':'draft','REFUND':'fail'}.get(r['kind'], 'none') }}">
                     {{ kind_labels.get(r['kind'], r['kind']) }}
                   </span>
                 </td>
@@ -124,12 +128,15 @@
                 <td class="small">{{ describe(r) }}</td>
                 <td class="small">{{ PAYMENT_METHODS.get(r['payment_method'], r['payment_method']) }}</td>
                 <td class="small muted">{{ r['staff_name'] }}</td>
-                <td class="right bold">{{ r['total'] | money }}</td>
+                <td class="right bold" {% if r['total'] < 0 %}style="color:var(--red-600)"{% endif %}>
+                  {{ r['total'] | money }}</td>
                 <td class="right nowrap">
                   {% if r['kind'] == 'MEMBERSHIP' %}
                     <a class="small" href="{{ url_for('memberships.receipt', membership_id=r['id']) }}">Recibo</a>
-                  {% else %}
+                  {% elif r['kind'] == 'SALE' %}
                     <a class="small" href="{{ url_for('sales.receipt', sale_id=r['id']) }}">Recibo</a>
+                  {% else %}
+                    <a class="small" href="{{ url_for('refunds.history') }}">Ver</a>
                   {% endif %}
                 </td>
               </tr>

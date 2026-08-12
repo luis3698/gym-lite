@@ -15,7 +15,7 @@ from ..helpers import (
     parse_age,
 )
 from ..security import audit, hash_password, login_required, roles_required, verify_password
-from ..uploads import UploadError, delete_image, resolve_photo, save_image
+from ..uploads import UploadError, delete_image, resolve_captured_photo
 
 bp = Blueprint("users", __name__, url_prefix="/usuarios")
 
@@ -71,8 +71,8 @@ def profile():
         try:
             data = _read_profile(request.form)
             _check_unique(data["email"], data["document_id"], exclude_id=user["id"])
-            photo, to_delete = resolve_photo(
-                user["photo"], request.files.get("photo"), request.form.get("remove_photo")
+            photo, to_delete = resolve_captured_photo(
+                user["photo"], request.form.get("photo_data")
             )
             execute(
                 """UPDATE users SET first_name = ?, last_name = ?, document_id = ?, sex = ?,
@@ -171,7 +171,7 @@ def create():
                 raise ValueError("El nombre de usuario ya existe.")
             _check_unique(data["email"], data["document_id"])
 
-            photo = save_image(request.files.get("photo"))
+            photo, _ = resolve_captured_photo(None, request.form.get("photo_data"))
             now = now_str()
             insert(
                 """INSERT INTO users (username, password_hash, role, first_name, last_name,
@@ -216,8 +216,8 @@ def edit(user_id: int):
 
             data = _read_profile(request.form)
             _check_unique(data["email"], data["document_id"], exclude_id=user_id)
-            photo, to_delete = resolve_photo(
-                target["photo"], request.files.get("photo"), request.form.get("remove_photo")
+            photo, to_delete = resolve_captured_photo(
+                target["photo"], request.form.get("photo_data")
             )
 
             execute(

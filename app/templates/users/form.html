@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import image_field %}
+{% from "_macros.html" import photo_capture %}
 {% block title %}{{ 'Crear usuario' if is_new else 'Editar usuario' }} — GymManager Lite{% endblock %}
 
 {% block content %}
@@ -13,7 +13,7 @@
         action="{{ url_for('users.create') if is_new else url_for('users.edit', user_id=user['id']) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    {{ image_field(user['photo'] if not is_new else none, 'Foto del usuario') }}
+    {{ photo_capture(user['photo'] if not is_new else none, 'Foto del usuario') }}
 
     <div class="grid cols-2">
       <label class="field"><span>Rol *</span>
@@ -70,4 +70,8 @@
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='photo-capture.js') }}" defer></script>
 {% endblock %}

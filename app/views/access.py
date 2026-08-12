@@ -28,7 +28,7 @@ from ..config import (
     MAX_FACES_PER_CLIENT,
     MIN_FACE_COOLDOWN_SECONDS,
 )
-from ..db import execute, insert, query_all, query_one, query_value
+from ..db import execute, insert, query_all, query_one, query_value, transaction
 from ..faces import (
     InvalidDescriptor,
     best_match,
@@ -278,7 +278,10 @@ def _decide(client_id: int) -> tuple[bool, str]:
         return True, "ACTIVE"
 
     # Se distingue la pausa del vencimiento: al socio hay que decirle cosas distintas
-    # («reanude su inscripción» no es lo mismo que «renuévela»).
+    # («reanude su inscripción» no es lo mismo que «renuévela»). Se mira si hay
+    # CUALQUIER inscripción todavía en pausa (sin reanudar): reanudarla es una acción
+    # concreta que el mostrador puede ofrecer, sin importar si después se compró otra
+    # inscripción aparte que ya venció por su cuenta.
     is_paused = query_value(
         "SELECT COUNT(*) FROM memberships WHERE client_id = ? AND paused_at IS NOT NULL",
         (client_id,),
@@ -346,13 +349,25 @@ def identify():
 
     # Antirrebote: quien sigue plantado delante de la cámara no genera una entrada
     # nueva cada segundo. Se le sigue enseñando su ficha, marcada como ya registrada.
-    if not within_cooldown and _visits_today(client_id) < MAX_ACCESS_LOGS_PER_DAY:
-        insert(
-            """INSERT INTO access_logs (client_id, allowed, reason, distance, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            (client_id, 1 if allowed else 0, reason, round(distance, 4), now_str()),
-        )
-        elapsed = 0
+    #
+    # El kiosco llama a esto varias veces por segundo y el servidor corre con varios
+    # hilos, así que dos peticiones casi simultáneas para el mismo cliente podrían leer
+    # las dos «no está en antirrebote» antes de que ninguna escriba. La comprobación se
+    # repite dentro de la transacción, con el bloqueo de escritura ya tomado, para que la
+    # segunda vea ya el registro de la primera. Si la lectura de fuera ya dice que está
+    # en antirrebote no hace falta abrir una transacción para confirmarlo: solo hay
+    # riesgo de colarse cuando se va a escribir.
+    if not within_cooldown:
+        with transaction() as db:
+            elapsed = _seconds_since_last(client_id)
+            within_cooldown = elapsed is not None and elapsed < face_cooldown_seconds()
+            if not within_cooldown and _visits_today(client_id) < MAX_ACCESS_LOGS_PER_DAY:
+                db.execute(
+                    """INSERT INTO access_logs (client_id, allowed, reason, distance, created_at)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (client_id, 1 if allowed else 0, reason, round(distance, 4), now_str()),
+                )
+                elapsed = 0
 
     return jsonify({
         "ok": True,

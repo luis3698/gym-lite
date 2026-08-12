@@ -12,6 +12,8 @@ from ..config import MAX_ITEM_QUANTITY, VALID_PAYMENT_METHODS
 from ..db import query_all, query_one, transaction
 from ..helpers import now_str, optional_string
 from ..security import audit, roles_required
+from ..receipts import receipt_barcode
+from ..settings import business_info
 
 bp = Blueprint("sales", __name__, url_prefix="/ventas")
 
@@ -304,7 +306,13 @@ def receipt(sale_id: int):
             WHERE si.sale_id = ?""",
         (sale_id,),
     )
-    return render_template("sales/receipt.html", sale=sale, items=items)
+    return render_template(
+        "sales/receipt.html",
+        sale=sale,
+        items=items,
+        negocio=business_info(),
+        codigo=receipt_barcode("SALE", sale_id),
+    )
 
 
 @bp.route("/historial")

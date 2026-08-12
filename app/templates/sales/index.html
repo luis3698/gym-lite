@@ -61,11 +61,15 @@
                 <p class="small bold" style="margin:0">{{ line.name }}</p>
                 <p class="tiny muted" style="margin:0">{{ line.price | money }} c/u · stock {{ line.stock }}</p>
               </div>
-              <form method="post" action="{{ url_for('sales.cart_update', product_id=line.id) }}" class="row tight" style="align-items:center">
+              {# Sin botón de confirmar: la cantidad se guarda sola. El <noscript>
+                 deja uno visible para quien tenga el JavaScript desactivado, que si no
+                 se quedaría sin forma de cambiarla. #}
+              <form method="post" action="{{ url_for('sales.cart_update', product_id=line.id) }}"
+                    class="row tight" style="align-items:center" data-cart-line>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="number" name="quantity" value="{{ line.quantity }}" min="1" max="{{ line.stock }}"
-                       style="width:64px" onchange="this.form.submit()">
-                <button class="btn btn-secondary btn-sm">OK</button>
+                       style="width:64px" data-cart-quantity aria-label="Cantidad de {{ line.name }}">
+                <noscript><button class="btn btn-secondary btn-sm">OK</button></noscript>
               </form>
               <form method="post" action="{{ url_for('sales.cart_remove', product_id=line.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -88,4 +92,8 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='cart.js') }}" defer></script>
 {% endblock %}

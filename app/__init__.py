@@ -12,13 +12,37 @@ from .helpers import register_filters
 from .security import get_csrf_token, load_logged_in_user, verify_csrf
 
 
+def _run_scheduled_backup(app: Flask) -> None:
+    """Hace la copia automática si toca. Nunca impide que el programa arranque.
+
+    Si algo falla —disco lleno, carpeta sin permisos— se avisa por consola y se sigue:
+    quedarse sin poder abrir el gimnasio porque falló una copia sería peor que la
+    propia falta de copia.
+    """
+    from .backups import BackupError, create_backup, due, prune_backups
+    from .settings import BACKUP_FREQUENCY, backup_keep, get_setting
+
+    try:
+        frecuencia = get_setting(BACKUP_FREQUENCY)
+        if not due(frecuencia):
+            return
+        ruta = create_backup(app.config["DATABASE"], suffix="auto")
+        borradas = prune_backups(backup_keep())
+        extra = f", {borradas} antigua(s) eliminada(s)" if borradas else ""
+        print(f"[GymManager Lite] Copia de seguridad automática: {ruta.name}{extra}")
+    except (BackupError, OSError) as exc:
+        print(f"[GymManager Lite] AVISO: no se pudo hacer la copia automática: {exc}")
+
+
 def create_app(*, database_path: str | None = None) -> Flask:
     app = Flask(__name__, instance_relative_config=False)
 
     app.config.update(
         SECRET_KEY=cfg.get_secret_key(),
         DATABASE=str(database_path or cfg.DATABASE_PATH),
-        MAX_CONTENT_LENGTH=cfg.MAX_UPLOAD_BYTES + (1024 * 1024),
+        # Manda el envío más grande que admite el programa, que es restaurar una copia
+        # de seguridad. El tamaño de las fotos se sigue limitando aparte, al guardarlas.
+        MAX_CONTENT_LENGTH=cfg.MAX_BACKUP_UPLOAD_BYTES + (1024 * 1024),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         PERMANENT_SESSION_LIFETIME=timedelta(hours=cfg.SESSION_HOURS),
@@ -53,12 +77,21 @@ def create_app(*, database_path: str | None = None) -> Flask:
 
         ensure_defaults()
 
+        # Copia de seguridad automática. Se hace al arrancar y no con un temporizador
+        # porque el equipo de un gimnasio se enciende por la mañana y se apaga por la
+        # noche: un temporizador de 24 h no llegaría a dispararse nunca.
+        #
+        # Una base recién creada no se copia: estaría vacía y solo gastaría un hueco de
+        # los que se conservan.
+        if not is_new:
+            _run_scheduled_backup(app)
+
     app.before_request(load_logged_in_user)
     app.before_request(verify_csrf)
 
     from .views import (
-        access, audit, auth, body, clients, dashboard, income, memberships, migration,
-        products, sales, tariffs, users,
+        access, audit, auth, backup, body, business, clients, dashboard, income,
+        memberships, migration, products, refunds, sales, tariffs, users,
     )
 
     app.register_blueprint(auth.bp)
@@ -66,6 +99,9 @@ def create_app(*, database_path: str | None = None) -> Flask:
     app.register_blueprint(income.bp)
     app.register_blueprint(body.bp)
     app.register_blueprint(migration.bp)
+    app.register_blueprint(backup.bp)
+    app.register_blueprint(business.bp)
+    app.register_blueprint(refunds.bp)
     app.register_blueprint(dashboard.bp)
     app.register_blueprint(clients.bp)
     app.register_blueprint(memberships.bp)
@@ -128,8 +164,8 @@ def create_app(*, database_path: str | None = None) -> Flask:
     @app.errorhandler(413)
     def too_large(err):
         return render_template("error.html", code=413, title="Archivo demasiado grande",
-                               message=f"La imagen supera el máximo de "
-                                       f"{cfg.MAX_UPLOAD_BYTES // (1024 * 1024)} MB."), 413
+                               message=f"El archivo enviado supera el máximo de "
+                                       f"{cfg.MAX_BACKUP_UPLOAD_BYTES // (1024 * 1024)} MB."), 413
 
     @app.errorhandler(500)
     def server_error(err):

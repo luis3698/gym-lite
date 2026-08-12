@@ -75,8 +75,11 @@ def parse_optional_decimal(
     if number != number or number in (float("inf"), float("-inf")):
         raise InvalidNumber(f"{field} debe ser un número.")
     if number <= minimum or (maximum is not None and number > maximum):
-        limite = f"entre {minimum:g} y {maximum:g}" if maximum is not None else f"mayor que {minimum:g}"
-        raise InvalidNumber(f"{field} debe estar {limite}.")
+        # «debe estar entre 1 y 100» pero «debe ser mayor que 0»: con un solo límite,
+        # «estar» no es correcto y el mensaje se lee mal.
+        if maximum is not None:
+            raise InvalidNumber(f"{field} debe estar entre {minimum:g} y {maximum:g}.")
+        raise InvalidNumber(f"{field} debe ser mayor que {minimum:g}.")
     return round(number, 2)
 
 

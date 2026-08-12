@@ -28,6 +28,8 @@ from ..helpers import (
     today_str,
 )
 from ..security import audit, roles_required
+from ..receipts import receipt_barcode
+from ..settings import business_info
 
 bp = Blueprint("memberships", __name__, url_prefix="/inscripciones")
 
@@ -407,4 +409,10 @@ def receipt(membership_id: int):
             WHERE ms.membership_id = ?""",
         (membership_id,),
     )
-    return render_template("memberships/receipt.html", membership=membership, services=services)
+    return render_template(
+        "memberships/receipt.html",
+        membership=membership,
+        services=services,
+        negocio=business_info(),
+        codigo=receipt_barcode("MEMBERSHIP", membership_id),
+    )

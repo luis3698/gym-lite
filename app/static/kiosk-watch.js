@@ -1,4 +1,4 @@
-/* Aviso de la última entrada del kiosco, en las pantallas del programa.
+/* Aviso de las entradas del kiosco, en las pantallas del programa.
  *
  * Quien atiende el mostrador trabaja en esta pestaña, no en la del kiosco. Sin esto
  * tendría que cambiar de pestaña para saber si a quien acaba de pasar se le permitió
@@ -7,15 +7,21 @@
  * Aparece SOLO cuando alguien acaba de ser detectado —lo dejen entrar o no— y se
  * desvanece a los diez segundos: el resto del tiempo no debe tapar nada de la pantalla.
  *
- * En hora punta la gente entra en fila, más deprisa de lo que dura un aviso. Por eso
- * hay una COLA: el servidor devuelve todas las entradas que este navegador aún no ha
- * anunciado y se muestran una a una. Mientras queden pendientes cada una dura menos,
- * porque si no cinco personas seguidas significarían casi un minuto de avisos
- * arrastrándose por detrás de la realidad.
+ * ## El tiempo se cuenta por reloj, no con temporizadores
  *
- * Cada paso se anuncia una sola vez por sesión del navegador. Sin esa marca, cambiar
- * de página dentro de la misma ventana volvería a mostrar el aviso de alguien que ya
- * entró hace rato, que es peor que no mostrarlo.
+ * El navegador frena `setTimeout` en las pestañas que no se están mirando: a los pocos
+ * minutos en segundo plano pasan a dispararse como mucho una vez por minuto. Con
+ * temporizadores, cambiar de pestaña dejaba avisos congelados en pantalla durante
+ * minutos y hacía que la cola se descolgara de la realidad.
+ *
+ * Por eso cada aviso guarda el INSTANTE en que debe desaparecer (`expiraEn`) y un único
+ * latido recalcula la situación comparando con `Date.now()`. Que al navegador le dé por
+ * frenar el latido solo retrasa la reacción: en cuanto vuelve a correr, un solo tic
+ * pone todo en su sitio. La cuenta atrás sale igual mires la pestaña que mires.
+ *
+ * Cada pestaña lleva su propia marca de «hasta aquí ya lo enseñé» (en sessionStorage,
+ * que es por pestaña): así el aviso sale en la pestaña que se esté mirando, sin que una
+ * se lo coma para las demás.
  */
 (function () {
   'use strict';
@@ -24,19 +30,22 @@
   if (!box) return;
 
   var CFG = {
-    // Cada cuánto se pregunta al servidor. Con 4 s el aviso sale casi a la vez que la
-    // persona cruza la puerta, sin cargar el equipo.
+    // Cada cuánto se pregunta al servidor por entradas nuevas.
     POLL_MS: 4000,
-    // Cuánto se queda en pantalla antes de empezar a irse.
-    SHOW_MS: 10000,
-    // Lo que dura cada aviso cuando hay más esperando detrás. Suficiente para leer
-    // nombre y veredicto sin que la cola se descuelgue de lo que pasa en la puerta.
-    SHOW_EN_COLA_MS: 3500,
+    // Cada cuánto se revisa si toca mostrar u ocultar algo.
+    TICK_MS: 200,
+    // Lo que dura un aviso en pantalla.
+    DURACION_MS: 10000,
+    // Lo que dura cuando hay más esperando detrás: si no, cinco personas seguidas
+    // significarían casi un minuto de avisos arrastrándose por detrás de la realidad.
+    DURACION_EN_COLA_MS: 3500,
     // Duración del desvanecido. Debe coincidir con la transición de styles.css.
     FADE_MS: 900,
-    // Un paso más viejo que esto ya no se anuncia al cargar una página: interesa
-    // avisar de lo que acaba de ocurrir, no de lo que pasó hace media hora.
-    MAX_EDAD_S: 12
+    // Un paso más viejo que esto ya no se anuncia: interesa avisar de lo que acaba de
+    // ocurrir, no de lo que pasó hace rato.
+    MAX_EDAD_S: 12,
+    // Mínimo que se deja ver un aviso al que ya le quedaba poco, para que no parpadee.
+    MINIMO_VISIBLE_MS: 1500
   };
 
   var CLAVE_VISTO = 'gymlite.kioskWatch.ultimoVisto';
@@ -53,17 +62,10 @@
     timer: box.querySelector('[data-kw-timer] span')
   };
 
-  var temporizadorOcultar = null;
-  var temporizadorQuitar = null;
-  var timerConsulta = null;
-
-  var cola = [];            // entradas pendientes de anunciar, de la más vieja a la más nueva
-  var mostrando = false;    // hay un aviso en pantalla ahora mismo
-  // Verdadero mientras uno se está desvaneciendo. Sin este estado intermedio, la
-  // consulta periódica puede sacar el siguiente de la cola durante el desvanecido y
-  // el temporizador del anterior lo oculta nada más aparecer: la cola se vacía sola
-  // sin que nadie llegue a verla.
-  var cerrando = false;
+  // Estado, todo en marcas de tiempo absolutas para que nada dependa de temporizadores.
+  var cola = [];          // pendientes de mostrar, del más viejo al más nuevo
+  var actual = null;      // { evento, expiraEn, duracion }
+  var ocultandoHasta = 0; // instante en que termina el desvanecido (0 = no se está yendo)
 
   // --- Marca de lo ya anunciado --------------------------------------------
 
@@ -73,78 +75,6 @@
 
   function marcarVisto(id) {
     try { sessionStorage.setItem(CLAVE_VISTO, String(id)); } catch (e) { /* modo privado */ }
-  }
-
-  // --- Aparecer y desaparecer ----------------------------------------------
-
-  function ocultar(inmediato) {
-    clearTimeout(temporizadorOcultar);
-    clearTimeout(temporizadorQuitar);
-    box.classList.remove('is-visible');
-    mostrando = false;
-    cerrando = true;
-
-    var terminar = function () {
-      box.hidden = true;
-      cerrando = false;
-      // Al acabar de irse, si alguien más pasó mientras tanto, le toca a él.
-      siguiente();
-    };
-
-    if (inmediato) {
-      terminar();
-      return;
-    }
-    // Se espera al final del desvanecido para retirarlo del todo; si no, [hidden]
-    // lo haría desaparecer de golpe y no se vería la transición.
-    temporizadorQuitar = setTimeout(terminar, CFG.FADE_MS);
-  }
-
-  function mostrar(restanteMs) {
-    clearTimeout(temporizadorOcultar);
-    clearTimeout(temporizadorQuitar);
-    mostrando = true;
-    cerrando = false;
-
-    box.hidden = false;
-    // Forzar el cálculo de estilos entre quitar [hidden] y añadir la clase: sin esto
-    // el navegador agrupa ambos cambios y no hay transición de entrada.
-    void box.offsetWidth;
-    box.classList.add('is-visible');
-
-    // La barra se vacía en el tiempo que le quede al aviso.
-    el.timer.style.transition = 'none';
-    el.timer.style.width = '100%';
-    void el.timer.offsetWidth;
-    el.timer.style.transition = 'width ' + restanteMs + 'ms linear';
-    el.timer.style.width = '0%';
-
-    temporizadorOcultar = setTimeout(ocultar, restanteMs);
-  }
-
-  // Cerrar a mano descarta también lo que quede en cola: quien lo cierra quiere la
-  // pantalla despejada, no el siguiente aviso acto seguido.
-  el.close.addEventListener('click', function () {
-    cola = [];
-    ocultar(false);
-  });
-
-  // --- Cola -----------------------------------------------------------------
-
-  function siguiente() {
-    if (mostrando || cerrando || cola.length === 0) return;
-
-    var evento = cola.shift();
-    var quedan = cola.length;
-
-    // El último de la tanda se queda el tiempo completo; los anteriores, lo justo
-    // para leerlos, de modo que la cola no se descuelgue de lo que pasa en la puerta.
-    var duracion = quedan > 0 ? CFG.SHOW_EN_COLA_MS : CFG.SHOW_MS;
-    // Si la página se abrió con el aviso ya empezado, dura lo que le quedaba.
-    duracion = Math.max(2000, duracion - (evento.ago || 0) * 1000);
-
-    pintar(evento, quedan);
-    mostrar(duracion);
   }
 
   // --- Pintado --------------------------------------------------------------
@@ -162,6 +92,10 @@
       var img = document.createElement('img');
       img.src = evento.photo_url;
       img.alt = '';
+      // Una foto que no carga no debe dejar el hueco vacío.
+      img.addEventListener('error', function () {
+        el.photo.textContent = evento.initial || '?';
+      });
       el.photo.appendChild(img);
     } else {
       el.photo.textContent = evento.initial || '?';
@@ -179,8 +113,6 @@
       el.event.removeAttribute('href');
     }
 
-    // Con gente en fila, decir cuántos faltan evita que parezca que el aviso
-    // parpadea sin motivo.
     if (pendientes > 0) {
       el.pending.textContent = '+' + pendientes;
       el.pending.hidden = false;
@@ -189,7 +121,81 @@
     }
   }
 
-  // --- Consulta -------------------------------------------------------------
+  // --- Mostrar y ocultar ----------------------------------------------------
+
+  function mostrar(entrada) {
+    actual = entrada;
+    ocultandoHasta = 0;
+
+    pintar(entrada.evento, cola.length);
+    box.hidden = false;
+    // Forzar el cálculo de estilos entre quitar [hidden] y añadir la clase: sin esto
+    // el navegador agrupa ambos cambios y no hay transición de entrada.
+    void box.offsetWidth;
+    box.classList.add('is-visible');
+    latido();   // pinta la barra ya, sin esperar al siguiente tic
+  }
+
+  function empezarAOcultar() {
+    if (!actual) return;
+    actual = null;
+    ocultandoHasta = Date.now() + CFG.FADE_MS;
+    box.classList.remove('is-visible');
+  }
+
+  function retirar() {
+    ocultandoHasta = 0;
+    box.hidden = true;
+    el.timer.style.width = '0%';
+  }
+
+  // Cerrar a mano descarta también lo que quede en cola: quien lo cierra quiere la
+  // pantalla despejada, no el siguiente aviso acto seguido.
+  el.close.addEventListener('click', function () {
+    cola = [];
+    empezarAOcultar();
+  });
+
+  // --- Latido: única fuente de verdad ---------------------------------------
+
+  function latido() {
+    var ahora = Date.now();
+
+    // 1. ¿Terminó de desvanecerse lo anterior?
+    if (ocultandoHasta && ahora >= ocultandoHasta) retirar();
+
+    // 2. ¿Se le acabó el tiempo a lo que hay en pantalla?
+    if (actual) {
+      var restante = actual.expiraEn - ahora;
+      if (restante <= 0) {
+        empezarAOcultar();
+      } else {
+        // La barra se pinta a partir del tiempo real que queda, no con una transición
+        // de CSS: así coincide con la realidad aunque la pestaña haya estado parada.
+        el.timer.style.width = Math.max(0, Math.min(100, (restante / actual.duracion) * 100)) + '%';
+      }
+    }
+
+    // 3. Se descarta lo que haya caducado esperando turno.
+    while (cola.length && cola[0].expiraEn <= ahora) cola.shift();
+
+    // 4. ¿Toca sacar el siguiente?
+    //    En una pestaña que no se está mirando no se saca nada: gastaría su tiempo en
+    //    pantalla sin que nadie lo vea. Se queda en cola y, si al volver sigue vigente,
+    //    se muestra con lo que le reste.
+    if (!actual && !ocultandoHasta && cola.length && !document.hidden) {
+      var entrada = cola.shift();
+      // Con gente en fila cada aviso dura menos, para que la cola no se descuelgue.
+      var tope = cola.length > 0 ? CFG.DURACION_EN_COLA_MS : CFG.DURACION_MS;
+      entrada.expiraEn = Math.min(entrada.expiraEn, ahora + tope);
+      // Si le quedaba un suspiro, se le da un mínimo para que no parpadee.
+      entrada.expiraEn = Math.max(entrada.expiraEn, ahora + CFG.MINIMO_VISIBLE_MS);
+      entrada.duracion = entrada.expiraEn - ahora;
+      mostrar(entrada);
+    }
+  }
+
+  // --- Consulta al servidor -------------------------------------------------
 
   function consultar() {
     if (document.hidden) return;
@@ -204,29 +210,37 @@
       })
       .then(function (datos) {
         if (!datos.enabled) {
-          // Lo apagaron desde otra pestaña: ya no hay nada que anunciar.
+          // Lo apagaron desde otra pestaña: ya no hay nada que anunciar. Se sigue
+          // preguntando igualmente (la consulta es barata) para notar en cuanto lo
+          // vuelvan a activar, en vez de quedarse callado hasta recargar la página.
           cola = [];
-          ocultar(true);
-          clearInterval(timerConsulta);
+          actual = null;
+          retirar();
           return;
         }
 
         var eventos = datos.events || [];
-        if (eventos.length === 0) return;
+        if (!eventos.length) return;
 
-        // Se marca lo visto antes de decidir si se enseña: aunque un paso sea
-        // demasiado viejo para anunciarlo, no debe volver a aparecer en la siguiente
-        // consulta.
+        // Se marca lo visto aunque algún paso sea demasiado viejo para anunciarlo: si
+        // no, volvería en cada consulta.
         marcarVisto(eventos[eventos.length - 1].id);
 
-        // Sin `desde` el servidor manda solo la última: es una pantalla recién
-        // abierta fijando su punto de partida. Si ese paso ya es viejo no se anuncia,
-        // para no saltar por alguien que entró hace rato.
+        var ahora = Date.now();
         eventos.forEach(function (evento) {
-          if ((evento.ago || 0) <= CFG.MAX_EDAD_S) cola.push(evento);
+          var edad = evento.ago || 0;
+          if (edad > CFG.MAX_EDAD_S) return;
+          // El instante de caducidad se calcula desde cuándo ocurrió DE VERDAD, no
+          // desde cuándo llegó a esta pestaña. Por eso da igual en qué momento se abra
+          // o se cambie de pestaña: el aviso dura lo que le queda, ni más ni menos.
+          cola.push({
+            evento: evento,
+            expiraEn: ahora - edad * 1000 + CFG.DURACION_MS,
+            duracion: CFG.DURACION_MS
+          });
         });
 
-        siguiente();
+        latido();
       })
       .catch(function () {
         // El programa puede estar reiniciándose. No se avisa de nada: un error de red
@@ -235,11 +249,15 @@
       });
   }
 
-  // Al volver a la pestaña conviene mirar ya, sin esperar al siguiente ciclo.
+  // Al volver a la pestaña se mira ya, sin esperar al siguiente ciclo, y se recalcula
+  // todo: puede haber caducado lo que estaba en pantalla mientras no se miraba.
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) consultar();
+    if (document.hidden) return;
+    latido();
+    consultar();
   });
 
   consultar();
-  timerConsulta = setInterval(consultar, CFG.POLL_MS);
+  setInterval(latido, CFG.TICK_MS);
+  setInterval(consultar, CFG.POLL_MS);
 })();

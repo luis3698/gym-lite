@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import image_field %}
+{% from "_macros.html" import photo_capture %}
 {% block title %}Editar perfil — GymManager Lite{% endblock %}
 
 {% block content %}
@@ -15,7 +15,7 @@
   <form class="card stack" method="post" enctype="multipart/form-data">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    {{ image_field(user['photo'], 'Su foto') }}
+    {{ photo_capture(user['photo'], 'Su foto') }}
 
     <div class="grid cols-2">
       <label class="field"><span>Nombre *</span>
@@ -52,4 +52,8 @@
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='photo-capture.js') }}" defer></script>
 {% endblock %}

@@ -27,6 +27,9 @@
         <a href="{{ url_for('sales.index') }}" class="{{ 'active' if request.blueprint == 'sales' }}">
           <span>🛒</span> Venta de productos
         </a>
+        <a href="{{ url_for('refunds.index') }}" class="{{ 'active' if request.blueprint == 'refunds' }}">
+          <span>↩️</span> Devoluciones
+        </a>
       {% endif %}
       {% if r == 'ADMIN' %}
         <div class="nav-sep">Administración</div>
@@ -38,6 +41,12 @@
         </a>
         <a href="{{ url_for('users.index') }}" class="{{ 'active' if request.endpoint in ('users.index', 'users.create', 'users.edit') }}">
           <span>👥</span> Administrar usuarios
+        </a>
+        <a href="{{ url_for('business.index') }}" class="{{ 'active' if request.blueprint == 'business' }}">
+          <span>🏢</span> Datos del negocio
+        </a>
+        <a href="{{ url_for('backup.index') }}" class="{{ 'active' if request.blueprint == 'backup' }}">
+          <span>💾</span> Copias de seguridad
         </a>
         <a href="{{ url_for('migration.index') }}" class="{{ 'active' if request.blueprint == 'migration' }}">
           <span>📥</span> Migración de datos

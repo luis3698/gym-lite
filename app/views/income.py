@@ -33,12 +33,17 @@ bp = Blueprint("income", __name__, url_prefix="/ingresos")
 MAX_ROWS = 1000
 
 KINDS = {
-    "": "Inscripciones y ventas",
+    "": "Todo el movimiento",
     "MEMBERSHIP": "Solo inscripciones",
     "SALE": "Solo venta de productos",
+    "REFUND": "Solo devoluciones",
 }
 
-KIND_LABELS = {"MEMBERSHIP": "Inscripción", "SALE": "Venta de productos"}
+KIND_LABELS = {
+    "MEMBERSHIP": "Inscripción",
+    "SALE": "Venta de productos",
+    "REFUND": "Devolución",
+}
 
 # Las dos fuentes se normalizan a la misma forma para poder ordenarlas y filtrarlas
 # juntas. `detail_*` guarda lo propio de cada una: la duración en las inscripciones,
@@ -73,6 +78,27 @@ BASE_QUERY = """
            (SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si WHERE si.sale_id = s.id)
       FROM sales s
       JOIN users u ON u.id = s.seller_id
+
+    UNION ALL
+
+    -- Las devoluciones son dinero que SALE, así que entran con importe negativo. De
+    -- este modo cualquier suma del informe —el total, el reparto por método de pago,
+    -- el CSV— queda neta sin tener que restarlas aparte en cada sitio.
+    SELECT 'REFUND', r.id, r.created_at,
+           -r.amount, r.payment_method,
+           r.created_by_id,
+           u.first_name || ' ' || u.last_name,
+           COALESCE(c.first_name || ' ' || c.last_name, s.buyer_name, 'Recibo ' || r.doc_id),
+           COALESCE(c.document_id, s.buyer_document, ''),
+           c.id,
+           NULL, NULL,
+           NULL
+      FROM refunds r
+      JOIN users u ON u.id = r.created_by_id
+      -- Se enlaza con el recibo devuelto para poder mostrar de quién era la compra.
+      LEFT JOIN sales s       ON r.doc_type = 'SALE'       AND s.id = r.doc_id
+      LEFT JOIN memberships m ON r.doc_type = 'MEMBERSHIP' AND m.id = r.doc_id
+      LEFT JOIN clients c     ON c.id = COALESCE(m.client_id, s.client_id)
 """
 
 
@@ -149,14 +175,20 @@ def _totals(where: str, params: list) -> dict:
                    COALESCE(SUM(total), 0) AS total,
                    COALESCE(SUM(CASE WHEN kind = 'MEMBERSHIP' THEN total ELSE 0 END), 0) AS memberships,
                    COALESCE(SUM(CASE WHEN kind = 'SALE'       THEN total ELSE 0 END), 0) AS sales,
+                   COALESCE(SUM(CASE WHEN kind = 'REFUND'     THEN total ELSE 0 END), 0) AS refunds,
                    COUNT(CASE WHEN kind = 'MEMBERSHIP' THEN 1 END) AS n_memberships,
-                   COUNT(CASE WHEN kind = 'SALE'       THEN 1 END) AS n_sales
+                   COUNT(CASE WHEN kind = 'SALE'       THEN 1 END) AS n_sales,
+                   COUNT(CASE WHEN kind = 'REFUND'     THEN 1 END) AS n_refunds
               FROM ({BASE_QUERY}) WHERE 1 = 1 {where}""",
         params,
     )
     data = dict(row) if row else {}
-    movimientos = data.get("movimientos") or 0
-    data["promedio"] = (data.get("total") or 0) / movimientos if movimientos else 0
+    # `total` ya viene neto: las devoluciones suman en negativo. Se guarda aparte lo
+    # cobrado en bruto para poder enseñar las dos cifras sin recalcular.
+    data["bruto"] = (data.get("memberships") or 0) + (data.get("sales") or 0)
+    data["devuelto"] = abs(data.get("refunds") or 0)
+    cobros = (data.get("n_memberships") or 0) + (data.get("n_sales") or 0)
+    data["promedio"] = data["bruto"] / cobros if cobros else 0
     return data
 
 
@@ -173,6 +205,8 @@ def describe(row) -> str:
     """Texto de la columna «Detalle», propio de cada tipo de movimiento."""
     if row["kind"] == "MEMBERSHIP":
         return duration_label(row["detail_duration"], row["detail_quantity"])
+    if row["kind"] == "REFUND":
+        return "Devolución sobre un recibo"
     units = row["detail_units"] or 0
     return f"{units} unidad(es)"
 
@@ -235,11 +269,15 @@ def export_csv():
 
     if rows:
         writer.writerow([])
-        writer.writerow(["", "", "", "", "", "", "TOTAL", f"{totals.get('total', 0):.2f}".replace(".", ",")])
         writer.writerow(["", "", "", "", "", "", "Inscripciones",
                          f"{totals.get('memberships', 0):.2f}".replace(".", ",")])
         writer.writerow(["", "", "", "", "", "", "Venta de productos",
                          f"{totals.get('sales', 0):.2f}".replace(".", ",")])
+        writer.writerow(["", "", "", "", "", "", "Devoluciones",
+                         f"{totals.get('refunds', 0):.2f}".replace(".", ",")])
+        # El neto es lo que quedó en caja: lo cobrado menos lo devuelto.
+        writer.writerow(["", "", "", "", "", "", "TOTAL NETO",
+                         f"{totals.get('total', 0):.2f}".replace(".", ",")])
 
     # BOM para que Excel en Windows reconozca el UTF-8 y no rompa las tildes.
     data = "﻿" + buffer.getvalue()

@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% from "_receipt.html" import ticket %}
+{% block title %}Datos del negocio — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Datos del negocio</h1>
+    <p class="muted">
+      Lo que se imprime en la cabecera y el pie de todos los recibos.
+    </p>
+  </div>
+
+  <div class="grid" style="grid-template-columns: minmax(0, 1.3fr) auto; align-items:start">
+
+    {# --- Formulario --- #}
+    <form method="post" class="card stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="grid cols-2">
+        {% for clave, etiqueta, pista, multi in campos %}
+          {% if not multi %}
+            <label class="field">
+              <span>{{ etiqueta }}{{ ' *' if clave == 'business_name' }}</span>
+              <input type="text" name="{{ clave }}" value="{{ valores[clave] }}"
+                     {{ 'required' if clave == 'business_name' }}>
+              {% if pista %}<span class="tiny muted">{{ pista }}</span>{% endif %}
+            </label>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      {% for clave, etiqueta, pista, multi in campos %}
+        {% if multi %}
+          <label class="field">
+            <span>{{ etiqueta }}</span>
+            <textarea name="{{ clave }}" rows="4">{{ valores[clave] }}</textarea>
+            {% if pista %}<span class="tiny muted">{{ pista }}</span>{% endif %}
+          </label>
+        {% endif %}
+      {% endfor %}
+
+      <label class="field" style="max-width:280px">
+        <span>Ancho del papel</span>
+        <select name="receipt_width">
+          {% for key, label in anchos.items() %}
+            <option value="{{ key }}" {{ 'selected' if ancho == key }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <span class="tiny muted">Mírelo en el rollo o en la caja de la impresora.</span>
+      </label>
+
+      <div class="row">
+        <button class="btn btn-primary">Guardar</button>
+        <span class="tiny muted">Los recibos ya emitidos se reimprimen con los datos nuevos.</span>
+      </div>
+    </form>
+
+    {# --- Vista previa --- #}
+    <div class="stack" style="gap:.6rem">
+      <div class="row between">
+        <h2 style="margin:0">Así saldrá</h2>
+        <button type="button" class="btn btn-secondary btn-sm no-print" onclick="window.print()">
+          🖨️ Imprimir prueba
+        </button>
+      </div>
+      <div class="ticket-preview">
+        {{ ticket(
+            negocio,
+            'RECIBO DE VENTA',
+            'V-000123',
+            '11/08/2026 16:45',
+            ('Ana María Martínez', '1.012.345.678', '300 123 4567'),
+            'Carlos Ruiz',
+            [('Proteína Whey 1kg  1 x $90.000', '$90.000', false),
+             ('Bebida isotónica  2 x $6.000', '$12.000', false),
+             ('Toalla de gimnasio  1 x $25.000', '$25.000', false)],
+            '$127.000',
+            'Efectivo',
+            [('Artículos', 4)]
+        ) }}
+      </div>
+      <p class="tiny muted" style="text-align:center;max-width:320px;margin:0 auto">
+        Es un ejemplo con datos inventados. Se imprime a tamaño real: lo que ve aquí es
+        lo que saldrá por la impresora térmica.
+      </p>
+    </div>
+  </div>
+
+  {# --- Códigos de barras --- #}
+  <div class="card no-print">
+    <div class="row between" style="align-items:flex-start">
+      <div style="flex:1;min-width:280px">
+        <h2 style="margin:0 0 .3rem">
+          Código de barras en los recibos
+          <span class="badge {{ 'ok' if codigos else 'none' }}" style="vertical-align:middle;margin-left:.4rem">
+            {{ 'Activado' if codigos else 'Desactivado' }}
+          </span>
+        </h2>
+        <p class="tiny muted" style="margin:0">
+          Es lo que permite leer un recibo en <strong>Devoluciones</strong> y que aparezca
+          la compra sin buscarla a mano. Al desactivarlo, los recibos ya impresos siguen
+          funcionando: solo dejan de imprimirse los nuevos.
+        </p>
+        {% if ejemplo %}
+          <div class="barcode-sample">{{ ejemplo | safe }}</div>
+        {% endif %}
+      </div>
+
+      <form method="post" class="stack" style="min-width:230px;gap:.5rem">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="accion" value="barcode">
+        <input type="hidden" name="enabled" value="{{ '0' if codigos else '1' }}">
+        <label class="field">
+          <span>Su contraseña</span>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button class="btn {{ 'btn-ghost-danger' if codigos else 'btn-primary' }}">
+          {{ 'Desactivar códigos' if codigos else 'Activar códigos' }}
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="notice no-print">
+    <strong>Sobre las leyendas legales.</strong> El pie viene con un texto de ejemplo
+    («Documento equivalente. No es una factura electrónica») que sirve para un recibo
+    interno de caja. Si su gimnasio factura electrónicamente o tiene resolución de
+    facturación de la DIAN, sustituya ese texto y la nota tributaria por los datos que le
+    correspondan: el programa imprime lo que usted escriba, no valida ni asigna
+    numeración fiscal.
+  </div>
+</div>
+{% endblock %}

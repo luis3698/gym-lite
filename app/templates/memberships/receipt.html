@@ -1,7 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Recibo de inscripción I-{{ '%06d' % membership['id'] }}{% endblock %}
+{% from "_receipt.html" import ticket %}
+{% block title %}Recibo de inscripción I{{ '%06d' % membership['id'] }}{% endblock %}
 
 {% block content %}
+{# El tamaño de página se declara aquí porque depende del ancho de rollo configurado y
+   `@page` no admite variables de CSS. `auto` de alto: el rollo se corta donde acaba. #}
+<style>@page { size: {{ negocio.width }}mm auto; margin: 0; }</style>
+
 <div class="stack">
   <div class="row between no-print">
     <div>
@@ -10,44 +15,40 @@
     </div>
     <div class="row tight">
       <a class="btn btn-secondary" href="{{ url_for('memberships.manage', client_id=membership['client_id']) }}">← Volver</a>
-      {# window.print() es la única línea de JavaScript de la aplicación: abre el
-         diálogo de impresión del navegador, que también permite «Guardar como PDF». #}
-      <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+      {# window.print() abre el diálogo del navegador, que también permite «Guardar como PDF». #}
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimir</button>
     </div>
   </div>
 
-  <div class="card" style="max-width:620px">
-    <div class="receipt">
-      <p class="head">GymManager Lite — Recibo de inscripción</p>
-      <p class="tiny muted" style="margin:0">N.º de recibo: I-{{ '%06d' % membership['id'] }}</p>
-      <p class="tiny muted" style="margin:0">Fecha: {{ membership['created_at'] | fechahora }}</p>
-      <div class="sep"></div>
+  <div class="ticket-preview">
+    {% set lineas = [('Inscripción ' ~ duracion(membership['duration_type'], membership['quantity']),
+                      membership['base_price'] | money, false)] %}
+    {% for s in services %}
+      {% set _ = lineas.append((s['name'], s['price'] | money, true)) %}
+    {% endfor %}
 
-      <p style="margin:0" class="bold">
-        {{ membership['client_first'] }} {{ membership['client_last'] }} — {{ membership['client_document'] }}
-      </p>
-      <p style="margin:0" class="muted">
-        Duración: {{ duracion(membership['duration_type'], membership['quantity']) }}
-      </p>
-      <p style="margin:0" class="muted">
-        Vigencia: {{ membership['start_date'] | fecha }} — {{ membership['end_date'] | fecha }}
-      </p>
-
-      <div class="sep"></div>
-      <div class="line"><span>Inscripción</span><span>{{ membership['base_price'] | money }}</span></div>
-      {% for s in services %}
-        <div class="line muted"><span>{{ s['name'] }}</span><span>{{ s['price'] | money }}</span></div>
-      {% endfor %}
-      <div class="sep"></div>
-      <div class="line bold" style="font-size:1rem"><span>Total pagado</span><span>{{ membership['total'] | money }}</span></div>
-
-      <p class="tiny muted" style="margin:.6rem 0 0">
-        Método de pago: {{ PAYMENT_METHODS.get(membership['payment_method'], membership['payment_method']) }}
-      </p>
-      <p class="tiny muted" style="margin:0">
-        Atendido por: {{ membership['seller_first'] }} {{ membership['seller_last'] }}
-      </p>
-    </div>
+    {{ ticket(
+        negocio,
+        'RECIBO DE INSCRIPCIÓN',
+        'I%06d' % membership['id'],
+        membership['created_at'] | fechahora,
+        (membership['client_first'] ~ ' ' ~ membership['client_last'], membership['client_document']),
+        membership['seller_first'] ~ ' ' ~ membership['seller_last'],
+        lineas,
+        membership['total'] | money,
+        PAYMENT_METHODS.get(membership['payment_method'], membership['payment_method']),
+        [('Vigencia desde', membership['start_date'] | fecha),
+         ('Vence el', membership['end_date'] | fecha)],
+        codigo
+    ) }}
   </div>
+
+  <p class="tiny muted no-print" style="text-align:center">
+    Formato de {{ negocio.width }} mm.
+    {% if current_user['role'] == 'ADMIN' %}
+      Los datos del establecimiento se cambian en
+      <a href="{{ url_for('business.index') }}">Datos del negocio</a>.
+    {% endif %}
+  </p>
 </div>
 {% endblock %}
