@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Programa bloqueado — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="error-page">
+  <div class="box">
+    <div class="code">🔒</div>
+    <h1>El programa no está disponible ahora mismo</h1>
+    <p class="muted">
+      {% if status.state == 'REVOKED' %}
+        La licencia de este equipo fue revocada.
+      {% elif status.state == 'EXPIRED' %}
+        La licencia de este equipo venció.
+      {% elif status.state == 'OFFLINE_GRACE_EXCEEDED' %}
+        Este equipo lleva demasiado tiempo sin conectarse a internet para revalidar la licencia.
+      {% elif status.state == 'CLOCK_TAMPER_SUSPECTED' %}
+        No se pudo confirmar la hora de este equipo.
+      {% else %}
+        El programa necesita que un administrador revise la licencia.
+      {% endif %}
+      Pídale a un administrador que inicie sesión para resolverlo.
+    </p>
+    <p style="margin-top:1.5rem">
+      <a class="btn btn-primary" href="{{ url_for('auth.logout') }}">Cerrar sesión</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

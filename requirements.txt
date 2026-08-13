@@ -1,3 +1,8 @@
-# GymManager Lite — única dependencia externa.
-# El resto (SQLite, hash de contraseñas, CSV, plantillas Jinja2) viene con Python.
+# GymManager Lite.
+# El resto (SQLite, hash de contraseñas, CSV, plantillas Jinja2, HMAC) viene con Python.
 Flask>=3.0,<4.0
+# Licenciamiento (app/firebase_client.py): llamadas REST a Firebase.
+requests>=2.31,<3.0
+# Licenciamiento (app/licensing.py): cifra la clave local con DPAPI de Windows
+# cuando está disponible; si el empaquetado falla, hay una reserva a archivo plano.
+pywin32>=306

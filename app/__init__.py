@@ -8,6 +8,7 @@ from flask import Flask, g, render_template, send_from_directory
 
 from . import config as cfg
 from . import db as database
+from . import licensing
 from .helpers import register_filters
 from .security import get_csrf_token, load_logged_in_user, verify_csrf
 
@@ -61,6 +62,11 @@ def create_app(*, database_path: str | None = None) -> Flask:
     # indefinido dentro de los formularios de confirmación de _macros.html.
     app.jinja_env.globals["csrf_token"] = get_csrf_token
 
+    # Filtro aparte para las fechas de la licencia: vienen de Firebase en ISO 8601
+    # con zona horaria, no en el formato de texto sin zona que usa el resto de la
+    # aplicación, así que `fechahora` (ver register_filters) no las reconoce.
+    app.jinja_env.filters["fecha_licencia"] = licensing.format_display
+
     # Crea el esquema y, si la base está recién hecha, carga los datos iniciales.
     with app.app_context():
         is_new = database.init_db(app)
@@ -88,10 +94,16 @@ def create_app(*, database_path: str | None = None) -> Flask:
 
     app.before_request(load_logged_in_user)
     app.before_request(verify_csrf)
+    # Tercer y último before_request: se registra después de verify_csrf para que
+    # una petición sin licencia usable siga pasando por la comprobación de CSRF
+    # antes de decidir si se redirige (mismo orden de responsabilidades que ya
+    # tenían los dos primeros). Ver app/licensing.py para las rutas exentas.
+    app.before_request(licensing.license_gate)
 
     from .views import (
         access, audit, auth, backup, body, business, clients, dashboard, income,
-        memberships, migration, products, refunds, sales, tariffs, users,
+        licensing as licensing_views, memberships, migration, products, refunds,
+        sales, tariffs, users,
     )
 
     app.register_blueprint(auth.bp)
@@ -110,6 +122,7 @@ def create_app(*, database_path: str | None = None) -> Flask:
     app.register_blueprint(tariffs.bp)
     app.register_blueprint(users.bp)
     app.register_blueprint(audit.bp)
+    app.register_blueprint(licensing_views.bp)
 
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename: str):
@@ -125,11 +138,32 @@ def create_app(*, database_path: str | None = None) -> Flask:
         """Valores disponibles en todas las plantillas sin pasarlos en cada render."""
         from .settings import face_recognition_enabled
 
+        # Insignia junto a «Información del software» en el menú. `license_status`
+        # solo lo deja puesto license_gate() en las páginas normales (no en las de
+        # licenciamiento mismas, que ya muestran su propio estado con detalle) — su
+        # ausencia no es un error, simplemente no hay nada que avisar ahí.
+        badge = badge_title = None
+        status = g.get("license_status")
+        if status is not None:
+            if status.state == "OFFLINE_GRACE" and status.grace_remaining_days is not None:
+                badge = "Sin conexión"
+                badge_title = f"Quedan {status.grace_remaining_days} día(s) sin conectar con Firebase"
+            elif status.tier == "TRIAL":
+                badge = "Prueba"
+                badge_title = "Licencia de prueba"
+            else:
+                dias = status.days_until_expiry
+                if dias is not None and 0 <= dias <= 7:
+                    badge = "Vence pronto"
+                    badge_title = f"La licencia vence en {dias} día(s)"
+
         return {
             "current_user": g.get("user"),
             # La barra lateral y la ficha de inscripción cambian según esté activado
             # el reconocimiento facial, así que el interruptor va en el contexto común.
             "FACE_ENABLED": face_recognition_enabled() if g.get("user") else False,
+            "LICENSE_BADGE": badge,
+            "LICENSE_BADGE_TITLE": badge_title,
             "ROLES": cfg.ROLES,
             "DURATIONS": cfg.DURATIONS,
             "PAYMENT_METHODS": cfg.PAYMENT_METHODS,

@@ -30,8 +30,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from tkinter import filedialog, font as tkfont, messagebox, ttk
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from version import APP_VERSION  # noqa: E402
+
 APP_NAME = "GymManager Lite"
-APP_VERSION = "1.0.2"
 PUBLISHER = "GymManager"
 EXE_NAME = "GymManager Lite.exe"
 UNINSTALLER_NAME = "Desinstalar GymManager Lite.exe"

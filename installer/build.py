@@ -28,8 +28,10 @@ BUILD_DIR = ROOT / "build"
 DIST_DIR = ROOT / "dist"
 VENV_DIR = ROOT / ".venv"
 
+sys.path.insert(0, str(ROOT))
+from version import APP_VERSION  # noqa: E402
+
 APP_NAME = "GymManager Lite"
-APP_VERSION = "1.0.2"
 PUBLISHER = "GymManager"
 SETUP_NAME = "GymManagerLite-Setup"
 UNINSTALLER_NAME = "Desinstalar GymManager Lite"
@@ -225,6 +227,10 @@ def build_setup(python: Path, icon: Path, logo: Path, payload: Path) -> Path:
             "--distpath", str(DIST_DIR),
             "--workpath", str(BUILD_DIR / "work-setup"),
             "--specpath", str(BUILD_DIR / "spec"),
+            # installer.py importa version.py, que vive en la raíz del repo, fuera de
+            # installer/: sin esto, el análisis estático de PyInstaller no lo
+            # encuentra (solo mira junto al script y en site-packages por defecto).
+            "--paths", str(ROOT),
             "--add-data", f"{payload}{sep()}payload",
             "--add-data", f"{INSTALLER_DIR / 'license.txt'}{sep()}.",
             "--add-data", f"{icon}{sep()}.",

@@ -1,0 +1,1093 @@
+<title>Manual — Instalación y licenciamiento de GymManager Lite</title>
+<style>
+  :root {
+    --paper: #f4f6fb;
+    --surface: #ffffff;
+    --surface-2: #eef1f8;
+    --line: #dde3f0;
+    --ink: #161b2e;
+    --ink-soft: #4b5370;
+    --ink-faint: #7a82a0;
+    --accent: #4f46e5;
+    --accent-deep: #312e81;
+    --accent-soft: #eef2ff;
+    --good: #15803d;
+    --good-soft: #f0fdf4;
+    --warn: #b45309;
+    --warn-soft: #fffbeb;
+    --bad: #b91c1c;
+    --bad-soft: #fef2f2;
+    --win-chrome: #1e2440;
+    --code-bg: #0f172a;
+    --code-ink: #cbd5e1;
+    --code-accent: #93c5fd;
+    --code-string: #86efac;
+    --shadow: 0 1px 2px rgba(23,26,50,.04), 0 8px 24px -12px rgba(23,26,50,.18);
+    --shadow-lg: 0 2px 4px rgba(23,26,50,.06), 0 24px 48px -16px rgba(23,26,50,.24);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0d1020;
+      --surface: #161a2e;
+      --surface-2: #1d2238;
+      --line: #2b3153;
+      --ink: #e7e9f7;
+      --ink-soft: #aab0d4;
+      --ink-faint: #7d84ab;
+      --accent: #818cf8;
+      --accent-deep: #a5b4fc;
+      --accent-soft: #23264a;
+      --good: #4ade80;
+      --good-soft: #10261a;
+      --warn: #fbbf24;
+      --warn-soft: #2a2110;
+      --bad: #f87171;
+      --bad-soft: #2a1414;
+      --win-chrome: #0a0c1a;
+      --code-bg: #060811;
+      --code-ink: #c7cce0;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+      --shadow-lg: 0 2px 4px rgba(0,0,0,.4), 0 24px 48px -16px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0d1020;
+    --surface: #161a2e;
+    --surface-2: #1d2238;
+    --line: #2b3153;
+    --ink: #e7e9f7;
+    --ink-soft: #aab0d4;
+    --ink-faint: #7d84ab;
+    --accent: #818cf8;
+    --accent-deep: #a5b4fc;
+    --accent-soft: #23264a;
+    --good: #4ade80;
+    --good-soft: #10261a;
+    --warn: #fbbf24;
+    --warn-soft: #2a2110;
+    --bad: #f87171;
+    --bad-soft: #2a1414;
+    --win-chrome: #0a0c1a;
+    --code-bg: #060811;
+    --code-ink: #c7cce0;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    --shadow-lg: 0 2px 4px rgba(0,0,0,.4), 0 24px 48px -16px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent); color: white; }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ---------- Masthead ---------- */
+  .masthead {
+    background: linear-gradient(165deg, var(--accent-deep), var(--accent) 130%);
+    color: #eef0ff;
+    padding: 56px 24px 64px;
+  }
+  .masthead-inner { max-width: 860px; margin: 0 auto; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: .72rem; letter-spacing: .12em; text-transform: uppercase;
+    color: #c7d2fe; font-weight: 600; margin-bottom: 18px;
+  }
+  .eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #a5b4fc; }
+  .masthead h1 {
+    font-size: clamp(1.9rem, 4vw, 2.5rem);
+    line-height: 1.15;
+    margin: 0 0 14px;
+    font-weight: 700;
+    text-wrap: balance;
+    color: #ffffff;
+  }
+  .masthead p.lede {
+    font-size: 1.05rem;
+    color: #dbe0ff;
+    max-width: 56ch;
+    margin: 0;
+  }
+  .masthead .meta {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    margin-top: 28px; font-size: .85rem; color: #c7d2fe;
+  }
+  .masthead .meta span { display: flex; align-items: center; gap: 7px; }
+  .masthead .meta b { color: #fff; font-weight: 600; }
+
+  /* ---------- Table of contents ---------- */
+  .toc {
+    margin-top: -34px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+    padding: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 4px;
+    position: relative;
+    z-index: 2;
+  }
+  .toc a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    border-radius: 9px;
+    text-decoration: none;
+    color: var(--ink);
+    font-size: .87rem;
+    font-weight: 600;
+  }
+  .toc a:hover { background: var(--accent-soft); color: var(--accent-deep); }
+  .toc a .n {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: .72rem; color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 5px; width: 20px; height: 20px;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* ---------- Sections ---------- */
+  section { margin-top: 76px; scroll-margin-top: 20px; }
+  section:first-of-type { margin-top: 56px; }
+  .section-head { margin-bottom: 28px; }
+  .section-kicker {
+    font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 8px;
+  }
+  .section-head h2 {
+    font-size: 1.6rem; margin: 0 0 10px; font-weight: 700; text-wrap: balance;
+  }
+  .section-head p {
+    color: var(--ink-soft); max-width: 62ch; margin: 0; font-size: .98rem;
+  }
+
+  /* ---------- Flow diagram ---------- */
+  .flow {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 28px 8px;
+    margin-bottom: 8px;
+  }
+  .flow-step { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 10px; position: relative; }
+  .flow-step .icon {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent-deep);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; margin-bottom: 12px;
+    border: 1px solid var(--line);
+  }
+  .flow-step .who { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 700; margin-bottom: 4px; }
+  .flow-step .what { font-size: .87rem; font-weight: 600; color: var(--ink); line-height: 1.35; }
+  .flow-arrow {
+    position: absolute; top: 26px; left: calc(50% + 40px); width: calc(100% - 30px);
+    height: 2px; background: var(--line);
+  }
+  .flow-arrow::after {
+    content: ""; position: absolute; right: -2px; top: -4px;
+    border: 5px solid transparent; border-left-color: var(--line);
+  }
+  @media (max-width: 700px) {
+    .flow { grid-template-columns: 1fr; gap: 24px; padding: 24px 20px; }
+    .flow-arrow { display: none; }
+  }
+
+  /* ---------- Callout note ---------- */
+  .note {
+    display: flex; gap: 12px;
+    background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    border-radius: 10px; padding: 16px 18px; margin: 20px 0; font-size: .92rem; color: var(--ink-soft);
+  }
+  .note.warn { border-left-color: var(--warn); }
+  .note.good { border-left-color: var(--good); }
+  .note b { color: var(--ink); }
+  .note .glyph { font-size: 1.1rem; line-height: 1.4; flex-shrink: 0; }
+
+  /* ---------- Step sequence for the installer ---------- */
+  .steps { display: flex; flex-direction: column; gap: 40px; }
+  .step { display: grid; grid-template-columns: 40px 1fr; gap: 18px; align-items: start; }
+  .step-num {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--accent-deep); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 1rem; font-family: ui-monospace, Consolas, monospace;
+    box-shadow: var(--shadow);
+  }
+  .step-body h3 { margin: 6px 0 6px; font-size: 1.08rem; }
+  .step-body p.desc { margin: 0 0 16px; color: var(--ink-soft); font-size: .92rem; max-width: 58ch; }
+
+  /* ---------- Window chrome: native installer ---------- */
+  .win {
+    border-radius: 10px; overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--line);
+    background: #ffffff;
+    max-width: 620px;
+  }
+  .win-bar {
+    background: var(--win-chrome); color: #cdd3ec;
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 12px; font-size: .78rem; font-weight: 500;
+  }
+  .win-bar .dots { display: flex; gap: 6px; margin-right: 4px; }
+  .win-bar .dots span { width: 9px; height: 9px; border-radius: 50%; background: #454b6e; }
+  .win-body { display: flex; min-height: 300px; }
+  .win-banner {
+    width: 30%; min-width: 118px;
+    background: linear-gradient(165deg, #4f46e5, #312e81 130%);
+    color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 20px 10px; text-align: center; gap: 3px;
+  }
+  .win-banner .logo { font-size: 1.9rem; margin-bottom: 10px; }
+  .win-banner .name { font-size: .8rem; font-weight: 700; }
+  .win-banner .ver { font-size: .68rem; color: #c7d2fe; }
+  .win-banner .tag { font-size: .62rem; color: #a5b4fc; margin-top: auto; padding-top: 16px; }
+  .win-content { flex: 1; padding: 20px 22px; color: #0f172a; font-size: .82rem; display: flex; flex-direction: column; }
+  .win-content h4 { font-size: .98rem; margin: 0 0 4px; color: #0f172a; }
+  .win-content .sub { color: #475569; font-size: .74rem; margin: 0 0 14px; }
+  .win-content .body-text { color: #1e293b; font-size: .78rem; line-height: 1.5; }
+  .win-content .body-text p { margin: 0 0 9px; }
+  .win-footer {
+    border-top: 1px solid #e2e8f0; background: #f8fafc;
+    display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px;
+  }
+  .wbtn {
+    font-size: .74rem; padding: 6px 14px; border-radius: 5px; border: 1px solid #cbd5e1;
+    background: #fff; color: #334155; font-weight: 500;
+  }
+  .wbtn.primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+  .wbtn.disabled { opacity: .45; }
+
+  .field-mini { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .field-mini label { font-size: .7rem; color: #475569; font-weight: 600; }
+  .field-mini .box {
+    border: 1px solid #cbd5e1; border-radius: 5px; padding: 6px 9px; font-size: .76rem;
+    background: #fff; color: #0f172a; font-family: ui-monospace, Consolas, monospace;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .row-btn { display: flex; gap: 6px; align-items: center; }
+  .chk { display: flex; align-items: center; gap: 7px; font-size: .78rem; color: #1e293b; margin: 5px 0; }
+  .chk .box-ck { width: 13px; height: 13px; border: 1.5px solid #94a3b8; border-radius: 3px; flex-shrink: 0; }
+  .chk.on .box-ck { background: #4f46e5; border-color: #4f46e5; position: relative; }
+  .chk.on .box-ck::after { content: "✓"; color: #fff; font-size: .62rem; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+
+  .license-box {
+    flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px;
+    padding: 9px 10px; font-size: .68rem; color: #334155; overflow: hidden;
+    font-family: ui-monospace, Consolas, monospace; line-height: 1.6;
+  }
+  .license-box p { margin: 0 0 6px; }
+
+  .summary-box {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px;
+    padding: 12px 14px; font-family: ui-monospace, Consolas, monospace; font-size: .7rem;
+    color: #0f172a; line-height: 1.7; white-space: pre-wrap;
+  }
+
+  .progress-track { height: 13px; border-radius: 7px; background: #e2e8f0; overflow: hidden; margin: 10px 0 6px; }
+  .progress-fill { height: 100%; background: #4f46e5; border-radius: 7px 0 0 7px; }
+  .progress-meta { display: flex; justify-content: space-between; font-size: .68rem; color: #64748b; margin-bottom: 12px; }
+  .term-mini {
+    background: #0f172a; color: #cbd5e1; border-radius: 5px; padding: 9px 11px;
+    font-family: ui-monospace, Consolas, monospace; font-size: .64rem; line-height: 1.7;
+    flex: 1; overflow: hidden;
+  }
+  .term-mini div { white-space: nowrap; }
+
+  .finish-badge { color: #15803d; font-weight: 700; font-size: .82rem; margin-bottom: 12px; }
+  .cred-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; font-size: .76rem; }
+  .cred-box .row { display: grid; grid-template-columns: 74px 1fr; gap: 4px; padding: 2px 0; }
+  .cred-box .row b { font-family: ui-monospace, Consolas, monospace; }
+  .cred-warn { color: #b91c1c; font-size: .68rem; margin-top: 8px; }
+
+  .win-caption {
+    margin-top: 12px; font-size: .82rem; color: var(--ink-soft);
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .win-caption .tag {
+    flex-shrink: 0; font-size: .65rem; text-transform: uppercase; letter-spacing: .05em;
+    background: var(--accent-soft); color: var(--accent-deep); border-radius: 4px;
+    padding: 2px 7px; font-weight: 700; margin-top: 1px;
+  }
+
+  /* ---------- Browser chrome: the app itself ---------- */
+  .browser {
+    border-radius: 10px; overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--line);
+    background: #eef1f8;
+    max-width: 560px;
+  }
+  .browser-bar {
+    background: #dde3f0; padding: 8px 10px; display: flex; align-items: center; gap: 8px;
+  }
+  .browser-bar .dots span { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+  .browser-bar .dots .r { background: #f87171; } .browser-bar .dots .y { background: #fbbf24; } .browser-bar .dots .g { background: #4ade80; }
+  .browser-url {
+    flex: 1; background: #fff; border-radius: 6px; padding: 4px 10px; font-size: .68rem;
+    color: #475569; font-family: ui-monospace, Consolas, monospace;
+  }
+  .browser-page { background: #f1f5f9; padding: 28px 24px; min-height: 260px; display: flex; flex-direction: column; }
+
+  .app-card {
+    background: #fff; border-radius: 8px; padding: 20px 22px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    color: #0f172a; font-size: .8rem;
+  }
+  .app-card h4 { margin: 0 0 3px; font-size: .95rem; }
+  .app-card .sub { color: #64748b; font-size: .72rem; margin-bottom: 14px; }
+  .app-field { margin-bottom: 10px; }
+  .app-field label { display: block; font-size: .68rem; color: #475569; margin-bottom: 3px; font-weight: 600; }
+  .app-field .in {
+    border: 1px solid #cbd5e1; border-radius: 5px; padding: 6px 9px; font-size: .74rem; background: #fff;
+    font-family: ui-monospace, Consolas, monospace; color: #94a3b8;
+  }
+  .app-field .in.filled { color: #0f172a; font-weight: 600; }
+  .app-btn {
+    background: #4f46e5; color: #fff; border-radius: 5px; padding: 7px 0; text-align: center;
+    font-size: .76rem; font-weight: 600; margin-top: 4px;
+  }
+  .app-foot { text-align: center; font-size: .64rem; color: #94a3b8; margin-top: 10px; }
+
+  .badge-mini {
+    display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 99px;
+    font-size: .64rem; font-weight: 700;
+  }
+  .badge-mini.ok { background: #dcfce7; color: #15803d; }
+
+  .deflist-mini { display: flex; flex-direction: column; gap: 7px; margin: 12px 0; }
+  .deflist-mini .r { display: grid; grid-template-columns: 42% 1fr; gap: 10px; font-size: .72rem; }
+  .deflist-mini .k { color: #64748b; }
+  .deflist-mini .v { color: #0f172a; font-weight: 600; font-family: ui-monospace, Consolas, monospace; font-size: .7rem; }
+
+  /* ---------- Terminal block (CLI) ---------- */
+  .terminal {
+    background: var(--code-bg); border-radius: 12px; box-shadow: var(--shadow);
+    overflow: hidden; margin: 18px 0;
+  }
+  .terminal-bar {
+    display: flex; align-items: center; gap: 7px; padding: 10px 14px;
+    background: rgba(255,255,255,.04);
+  }
+  .terminal-bar span { width: 10px; height: 10px; border-radius: 50%; background: #454b6e; }
+  .terminal-bar .label { margin-left: 8px; font-size: .7rem; color: #6b7299; font-family: ui-monospace, Consolas, monospace; }
+  .copy-btn {
+    margin-left: auto; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+    color: #d7dbef; font-size: .7rem; padding: 5px 11px; border-radius: 6px; cursor: pointer;
+    font-family: system-ui, sans-serif; font-weight: 600; display: flex; align-items: center; gap: 6px;
+    transition: background .15s ease;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,.16); }
+  .copy-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy-btn.copied { background: #15803d; border-color: #15803d; color: #fff; }
+  .terminal pre {
+    margin: 0; padding: 16px 20px 20px;
+    font-family: ui-monospace, Consolas, "SF Mono", monospace;
+    font-size: .82rem; line-height: 1.75; color: var(--code-ink);
+    overflow-x: auto; white-space: pre;
+  }
+  /* user-select:none: si alguien arrastra el mouse sobre todo el bloque para
+     copiarlo a mano (en vez de usar el botón «Copiar»), esta ruta de ejemplo
+     nunca entra en lo que se copia — es lo que evita pegar en la terminal una
+     línea que empieza por una ruta y no por el propio comando. */
+  .terminal .p { color: #6b7299; user-select: none; }
+  .terminal .cmd { color: #fff; }
+  .terminal .flag { color: var(--code-accent); }
+  .terminal .str { color: var(--code-string); }
+  .terminal .out { color: #94a3b8; }
+  .terminal .k { color: #a5b4fc; }
+
+  /* ---------- Command reference ---------- */
+  .cmdgrid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 20px; }
+  .cmdrow {
+    display: grid; grid-template-columns: 200px 1fr; gap: 18px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 18px; align-items: center;
+  }
+  .cmdrow code {
+    font-family: ui-monospace, Consolas, monospace; font-size: .82rem; color: var(--accent-deep);
+    background: var(--accent-soft); padding: 3px 8px; border-radius: 5px; white-space: nowrap; width: fit-content;
+  }
+  .cmdrow .desc { font-size: .85rem; color: var(--ink-soft); }
+  @media (max-width: 640px) { .cmdrow { grid-template-columns: 1fr; } }
+
+  /* ---------- License type cards / table ---------- */
+  .tiers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 22px; }
+  .tier {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px 18px; display: flex; flex-direction: column; gap: 10px;
+    box-shadow: var(--shadow);
+  }
+  .tier.perpetual { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+  .tier .tname { font-size: .92rem; font-weight: 700; }
+  .tier .tdur {
+    font-size: 1.5rem; font-weight: 800; color: var(--accent-deep); font-family: ui-monospace, Consolas, monospace;
+    line-height: 1;
+  }
+  .tier .tdur small { font-size: .62rem; font-weight: 600; color: var(--ink-faint); display: block; margin-top: 4px; font-family: system-ui, sans-serif; text-transform: uppercase; letter-spacing: .05em; }
+  .tier .tuse { font-size: .78rem; color: var(--ink-soft); line-height: 1.5; flex: 1; }
+  .tier .tcmd {
+    font-family: ui-monospace, Consolas, monospace; font-size: .66rem; color: var(--accent-deep);
+    background: var(--accent-soft); border-radius: 6px; padding: 6px 8px; word-break: break-all;
+  }
+  @media (max-width: 760px) { .tiers { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 460px) { .tiers { grid-template-columns: 1fr; } }
+
+  /* ---------- States reference ---------- */
+  .states { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+  .state-row {
+    display: grid; grid-template-columns: 180px 90px 1fr; gap: 16px; align-items: center;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+    padding: 12px 16px; font-size: .84rem;
+  }
+  .state-row .sname { font-weight: 700; font-family: ui-monospace, Consolas, monospace; font-size: .74rem; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: .68rem; font-weight: 700; padding: 3px 9px; border-radius: 99px; width: fit-content; }
+  .pill.ok { background: var(--good-soft); color: var(--good); }
+  .pill.bad { background: var(--bad-soft); color: var(--bad); }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .state-row .sdesc { color: var(--ink-soft); }
+  @media (max-width: 640px) { .state-row { grid-template-columns: 1fr; gap: 4px; } }
+
+  /* ---------- Misc ---------- */
+  code.inline {
+    font-family: ui-monospace, Consolas, monospace; font-size: .86em;
+    background: var(--surface-2); color: var(--accent-deep); padding: .1em .4em; border-radius: 4px;
+  }
+  .foot {
+    margin-top: 90px; padding-top: 26px; border-top: 1px solid var(--line);
+    color: var(--ink-faint); font-size: .8rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .toc, .flow, .step, .terminal, .tier { animation: rise .5s ease backwards; }
+    .step:nth-of-type(1){animation-delay:.02s} .step:nth-of-type(2){animation-delay:.05s}
+    .step:nth-of-type(3){animation-delay:.08s} .step:nth-of-type(4){animation-delay:.11s}
+    .step:nth-of-type(5){animation-delay:.14s} .step:nth-of-type(6){animation-delay:.17s} .step:nth-of-type(7){animation-delay:.2s}
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="eyebrow">Manual del proveedor</div>
+    <h1>Instalar, emitir y activar licencias de GymManager&nbsp;Lite</h1>
+    <p class="lede">
+      Guía visual completa: cómo se instala el programa en el equipo del cliente,
+      cómo emites una licencia desde tu herramienta, cómo el cliente la activa
+      dentro del programa, y qué tipos de licencia existen.
+    </p>
+    <div class="meta">
+      <span>🏋️ <b>GymManager Lite</b> v1.0.2</span>
+      <span>🔥 Licenciamiento con Firebase</span>
+      <span>🪟 Windows, sin necesitar internet a diario</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc">
+    <a href="#instalar"><span class="n">1</span> Instalar</a>
+    <a href="#emitir"><span class="n">2</span> Emitir licencia</a>
+    <a href="#activar"><span class="n">3</span> Activar</a>
+    <a href="#tipos"><span class="n">4</span> Tipos de licencia</a>
+    <a href="#estados"><span class="n">5</span> Estados</a>
+  </nav>
+
+  <!-- ===================== OVERVIEW ===================== -->
+  <section id="resumen">
+    <div class="section-head">
+      <p class="section-kicker">Panorama general</p>
+      <h2>Cuatro pasos, tres protagonistas</h2>
+      <p>El programa no depende de un servidor propio: Firebase guarda quién tiene
+      licencia, y una vez validada, el programa sigue funcionando sin conexión.
+      Así se reparte el trabajo entre tú y tu cliente:</p>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-arrow"></div>
+        <div class="icon">🔑</div>
+        <div class="who">Tú (proveedor)</div>
+        <div class="what">Emites una clave con <code class="inline">licensing_cli.py</code></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-arrow"></div>
+        <div class="icon">📦</div>
+        <div class="who">Cliente</div>
+        <div class="what">Instala el programa con el asistente</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-arrow"></div>
+        <div class="icon">✅</div>
+        <div class="who">Cliente</div>
+        <div class="what">Escribe la clave; Firebase la valida una vez</div>
+      </div>
+      <div class="flow-step">
+        <div class="icon">🏋️</div>
+        <div class="who">Resultado</div>
+        <div class="what">Programa activo, funciona sin internet después</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 1. INSTALAR ===================== -->
+  <section id="instalar">
+    <div class="section-head">
+      <p class="section-kicker">01 · Para el cliente</p>
+      <h2>Instalar el programa</h2>
+      <p>Se le entrega al cliente un único archivo, <code class="inline">GymManagerLite-Setup.exe</code>.
+      No necesita Python, internet ni permisos de administrador — el asistente
+      instala todo en su propio perfil de Windows. Estas son las siete pantallas,
+      en orden.</p>
+    </div>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Bienvenida</h3>
+          <p class="desc">Explica qué hace el programa y qué necesita el equipo. El botón «Atrás» está deshabilitado: es la primera pantalla.</p>
+          <div class="win">
+            <div class="win-bar"><div class="dots"><span></span><span></span><span></span></div>Instalación de GymManager Lite</div>
+            <div class="win-body">
+              <div class="win-banner">
+                <div class="logo">🏋️</div>
+                <div class="name">GymManager Lite</div>
+                <div class="ver">Versión 1.0.2</div>
+                <div class="tag">Gestión de gimnasio</div>
+              </div>
+              <div class="win-content">
+                <h4>Bienvenido a la instalación de GymManager Lite</h4>
+                <div class="body-text">
+                  <p>Este asistente instalará GymManager Lite 1.0.2 en su equipo.</p>
+                  <p>El programa gestiona clientes, inscripciones, inventario y ventas de un gimnasio. Funciona de forma local: no necesita internet ni servidores externos.</p>
+                  <p>Cierre el resto de aplicaciones antes de continuar y pulse «Siguiente».</p>
+                </div>
+              </div>
+            </div>
+            <div class="win-footer">
+              <div class="wbtn disabled">Cancelar</div>
+              <div class="wbtn disabled">Atrás</div>
+              <div class="wbtn primary">Siguiente</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Acuerdo de licencia</h3>
+          <p class="desc">Hay que marcar la casilla para continuar — el botón «Siguiente» permanece apagado hasta entonces.</p>
+          <div class="win">
+            <div class="win-bar"><div class="dots"><span></span><span></span><span></span></div>Instalación de GymManager Lite</div>
+            <div class="win-body">
+              <div class="win-banner">
+                <div class="logo">🏋️</div><div class="name">GymManager Lite</div><div class="ver">Versión 1.0.2</div>
+                <div class="tag">Gestión de gimnasio</div>
+              </div>
+              <div class="win-content">
+                <h4>Acuerdo de licencia</h4>
+                <p class="sub">Lea con atención los términos antes de continuar con la instalación.</p>
+                <div class="license-box">
+                  <p>GYMMANAGER LITE — ACUERDO DE LICENCIA DE USO</p>
+                  <p>Este software se entrega bajo licencia para el equipo en el que se activa…</p>
+                  <p>El uso del programa implica la aceptación de estos términos…</p>
+                </div>
+                <div class="chk on" style="margin-top:10px"><div class="box-ck"></div> Acepto los términos del acuerdo de licencia</div>
+              </div>
+            </div>
+            <div class="win-footer">
+              <div class="wbtn">Cancelar</div><div class="wbtn">Atrás</div><div class="wbtn primary">Siguiente</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Carpeta de destino</h3>
+          <p class="desc">Trae una ruta por defecto ya elegida. El asistente calcula el espacio necesario y avisa si la carpeta ya tiene una instalación previa.</p>
+          <div class="win">
+            <div class="win-bar"><div class="dots"><span></span><span></span><span></span></div>Instalación de GymManager Lite</div>
+            <div class="win-body">
+              <div class="win-banner">
+                <div class="logo">🏋️</div><div class="name">GymManager Lite</div><div class="ver">Versión 1.0.2</div>
+                <div class="tag">Gestión de gimnasio</div>
+              </div>
+              <div class="win-content">
+                <h4>Carpeta de destino</h4>
+                <p class="sub">Elija dónde se instalará el programa. Puede escribir la ruta o buscarla.</p>
+                <div class="row-btn">
+                  <div class="box" style="flex:1">C:\Users\Cliente\AppData\Local\Programs\GymManager Lite</div>
+                  <div class="wbtn" style="white-space:nowrap">Examinar…</div>
+                </div>
+                <p style="font-size:.72rem;color:#475569;margin:14px 0 0">
+                  Espacio necesario:&nbsp; 46.5 MB<br>Espacio disponible:&nbsp; 118.2 GB
+                </p>
+              </div>
+            </div>
+            <div class="win-footer">
+              <div class="wbtn">Cancelar</div><div class="wbtn">Atrás</div><div class="wbtn primary">Siguiente</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>Opciones de instalación</h3>
+          <p class="desc">Accesos directos y si el programa se abre solo al terminar. Si la carpeta ya tenía datos de una instalación anterior, aquí aparece además la opción de conservarlos o empezar limpio.</p>
+          <div class="win">
+            <div class="win-bar"><div class="dots"><span></span><span></span><span></span></div>Instalación de GymManager Lite</div>
+            <div class="win-body">
+              <div class="win-banner">
+                <div class="logo">🏋️</div><div class="name">GymManager Lite</div><div class="ver">Versión 1.0.2</div>
+                <div class="tag">Gestión de gimnasio</div>
+              </div>
+              <div class="win-content">
+                <h4>Opciones de instalación</h4>
+                <p class="sub">Seleccione los accesos directos que desea crear.</p>
+                <div class="chk on"><div class="box-ck"></div> Crear un acceso directo en el escritorio</div>
+                <div class="chk on"><div class="box-ck"></div> Crear un acceso directo en el menú Inicio</div>
+                <div class="chk on"><div class="box-ck"></div> Abrir GymManager Lite al terminar la instalación</div>
+              </div>
+            </div>
+            <div class="win-footer">
+              <div class="wbtn">Cancelar</div><div class="wbtn">Atrás</div><div class="wbtn primary">Siguiente</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>Todo listo para instalar</h3>
+          <p class="desc">Un resumen de lo elegido antes de tocar el disco. Aquí el botón cambia de «Siguiente» a «Instalar».</p>
+          <div class="win">
+            <div class="win-bar"><div class="dots"><span></span><span></span><span></span></div>Instalación de GymManager Lite</div>
+            <div class="win-body">
+              <div class="win-banner">
+                <div class="logo">🏋️</div><div class="name">GymManager Lite</div><div class="ver">Versión 1.0.2</div>
+                <div class="tag">Gestión de gimnasio</div>
+              </div>
+              <div class="win-content">
+                <h4>Todo listo para instalar</h4>
+                <p class="sub">Revise las opciones. Pulse «Instalar» para comenzar la copia de archivos.</p>
+                <div class="summary-box">Carpeta de destino:
+   C:\Users\Cliente\AppData\Local\Programs\GymManager Lite
+
+Accesos directos:
+   Escritorio:   sí
+   Menú Inicio:  sí
+
+Base de datos:
+   Limpia, con un único usuario administrador.</div>
+              </div>
+            </div>
+            <div class="win-footer">
+              <div class="wbtn">Cancelar</div><div class="wbtn">Atrás</div><div class="wbtn primary">Instalar</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <h3>Instalando</h3>
+          <p class="desc">Barra de progreso real y un registro tipo consola con cada archivo copiándose — nada de esperar a ciegas.</p>
+          <div class="win">
+            <div class="win-bar"><div class="dots"><span></span><span></span><span></span></div>Instalación de GymManager Lite</div>
+            <div class="win-body">
+              <div class="win-banner">
+                <div class="logo">🏋️</div><div class="name">GymManager Lite</div><div class="ver">Versión 1.0.2</div>
+                <div class="tag">Gestión de gimnasio</div>
+              </div>
+              <div class="win-content">
+                <h4>Instalando</h4>
+                <p class="sub">Espere mientras se copian los archivos del programa.</p>
+                <div class="progress-track"><div class="progress-fill" style="width:64%"></div></div>
+                <div class="progress-meta"><span>Instalando: app\static\styles.css</span><span>64 %</span></div>
+                <div class="term-mini">
+                  <div>&nbsp;&nbsp;GymManager Lite.exe</div>
+                  <div>&nbsp;&nbsp;_internal\app\templates\base.html</div>
+                  <div>&nbsp;&nbsp;_internal\app\static\styles.css</div>
+                  <div>&nbsp;&nbsp;_internal\app\licensing.py</div>
+                </div>
+              </div>
+            </div>
+            <div class="win-footer">
+              <div class="wbtn disabled">Cancelar</div><div class="wbtn disabled">Atrás</div><div class="wbtn disabled">Siguiente</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-body">
+          <h3>Instalación completada</h3>
+          <p class="desc">Muestra el usuario y contraseña del administrador que trae la base de datos limpia. Conviene decirle al cliente que la cambie de inmediato.</p>
+          <div class="win">
+            <div class="win-bar"><div class="dots"><span></span><span></span><span></span></div>Instalación de GymManager Lite</div>
+            <div class="win-body">
+              <div class="win-banner">
+                <div class="logo">🏋️</div><div class="name">GymManager Lite</div><div class="ver">Versión 1.0.2</div>
+                <div class="tag">Gestión de gimnasio</div>
+              </div>
+              <div class="win-content">
+                <h4>Instalación completada</h4>
+                <div class="finish-badge">✓ GymManager Lite se instaló correctamente en este equipo.</div>
+                <div class="cred-box">
+                  <div class="row"><span>Usuario:</span><b>Admin</b></div>
+                  <div class="row"><span>Contraseña:</span><b>Admin.123</b></div>
+                  <div class="cred-warn">Cambie esta contraseña la primera vez que entre, desde «Mi cuenta».</div>
+                </div>
+              </div>
+            </div>
+            <div class="win-footer">
+              <div class="wbtn disabled">Cancelar</div><div class="wbtn disabled">Atrás</div><div class="wbtn primary">Finalizar</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="note warn">
+      <span class="glyph">⚠️</span>
+      <div><b>El programa se instala, pero no queda usable todavía.</b> Al abrirlo por
+      primera vez pedirá una licencia — sin ella, ningún rol puede entrar más allá
+      de la pantalla de activación. Eso es exactamente lo que ven las secciones 2 y 3.</div>
+    </div>
+  </section>
+
+  <!-- ===================== 2. EMITIR LICENCIA ===================== -->
+  <section id="emitir">
+    <div class="section-head">
+      <p class="section-kicker">02 &middot; Para ti, el proveedor</p>
+      <h2>Emitir una licencia</h2>
+      <p>Se hace desde tu propio equipo, con una ventana &mdash; sin terminal, sin comandos.
+      Esta herramienta nunca viaja dentro del instalador del cliente. Necesita la clave
+      de administrador de tu proyecto Firebase, guardada en
+      <code class="inline">vendor_tools/serviceAccountKey.json</code>.</p>
+    </div>
+
+    <ol style="color:var(--ink-soft);font-size:.92rem;padding-left:1.3em;margin:0 0 18px">
+      <li style="margin-bottom:4px">En la carpeta <code class="inline">vendor_tools</code>, haz doble clic en
+        <b style="color:var(--ink)">&laquo;Abrir Licencias.bat&raquo;</b>.</li>
+      <li style="margin-bottom:4px">Escribe el <b style="color:var(--ink)">cliente</b> y elige el
+        <b style="color:var(--ink)">tipo de licencia</b>, y pulsa &laquo;Crear licencia&raquo;.</li>
+      <li>La clave aparece en una ventana con un bot&oacute;n para copiarla &mdash; entr&eacute;gasela al cliente
+        por donde uses normalmente (correo, WhatsApp).</li>
+    </ol>
+
+    <div class="win" style="max-width:100%">
+      <img src="data:image/png;base64,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1b2ZfdnrO0ov/a9Ad1gHWLR1Y7hWTy6KsN/AR7b1e/wIb/l52u5OnefrBduglom6485r1f/VMeaAQGfDKzQ9pi2PXTU2SNpwr2W7mt2q2VM9pZGo8Y/a840ZeKu6a5d92su3atzEMeovSWqsv738hFNLFl+Dms63BTi6PzrTHCQwjLd59OgxaetX6r/V/l3MwBQ9JvffTzdWSOMT+vDe+XrBKf2j//OwLF03AAAAAKDUvvvhB/1cXOx1nqD69eubJPfdNuL73KyXU1J0Xav42luKx9do3AzpMZe3PMipu8ATPGUHAAAAAEDSzv2ZmjhlijLXfOEyLSgoSJKPLhvFRSeVdexY7S7FRn30WMddGjU7zUMLgyk0+QcAAAAAwCDr2DEVF51UqVtI/PHyK/SXgfdpxvgxanzllZQoAAAAAADw6lhRkcZOf13/W/y+fjx9SqVqIfHj6VM6tHWT3vrsC0oUAAAAAAD49NbKVTq0dZPXYIQk/eHSSy+d5C2hs4UndPYPF+vI2bNqHtlUfwoOpnQBAAAAAICcW0a8tmSpUtetU/bWjW7nMQYkbF02JPfdNqwa//kaNe/cVXd076q4xo0V17TxBXj7BgAAAAAAUBV6m0bWkWPKOnZMSzds0qGtm3Ts670e5y9VQEIyjykRGhOnkNAw1QsN18UhIZQ+AAAAAAC11M/FxTpXVKjiopMqysly201D5RGQ8HceVF1lqb+IiHAVFX1XY8qidevWGjVqlM6fP6933nlH3333nR544AFFRUVp4cKFCgoK0t/+9jetWbNGH3/8sW25xx57TC1bttTnn3+uVatW6Z577lHXrl21ceNGvfXWWxoxYoS6du2q48eP67333lNJSYnuu+8+NW3aVB988IHWrVtnS+uGG27QAw88oIyMDL399tvq27evbrzxRp07d06LFi3SxRdf7LIOd911l26++WZ98cUX+vjjj/Xkk0+qefPmtvW5++679Ze//EW//PKL3njjDaWnp9vy69Spk4YOHaqjR4/q/fff1+nTpzVy5EjFxcXpww8/1PHjx/Xwww9r3759euONNyRJTz31lBo0aKDHHnvMln/fvn21atUqHThwQA899JAuuugi/e9//9OHH36om266Sbfccouys7P1/PPP+5XnyJEjdf78eb377rsqKSnR3XffrcjISOXm5ur55593qLfhw4erTZs2mjNnjjIyMnT77bfrlltu0bZt25SZmanjx48rKyvLNn9CQoItfWt9DBo0yJb+Cy+8oOHDhysxMVFz586VJI0cOVJpaWmaP3++LZ2OHTtqyJAhOnr0qD744AOdOnXKYTt++eUX3X333Tp69Kg+/PBDXXTRRRoyZIguueQSvf766zp06JCmTp2qiy++WCtWrFBJSYm+/vpr3XfffUpMTNS8efOUkZEhSXrkkUd0zTXX6Ndff9Unn3yi1NRUt/vwsGHDdP3112vhwoXaunWrJOnRRx9VfHy8vvjiC61evVp33323brjhBm3atEnvvPOOnnjiCTVo0ED//Oc/3abZqlUrjRw5Uvv27dObb74pSXr88cfVoEEDPf7445KkO+64QzfddJNWr16tyy67TJ07d9ayZcu0d+9eDR48WPHx8dq3b5+WL1+ukpISjRkzRvXq1dObb76ptm3bqnv37tq6dasWLFigzp07695779W6deu0dOlSt3n17NlTixYt0tatW23rd+zYMb344ou64447dPPNN+t///uf3n77bd14441KSkrSN998o2nTprmkL0kvvviizpw5oxdffFGS9OCDD+r666/X22+/bStHSRo6dKjXbbvxxht1/fXXa8uWLfroo4/Us2dPJSUl6eDBg1q1apUeeugh/fTTT3r//fd16tQpDRkyRJGRkXr33Xd15swZjRw5UufOndObb76piy++WIMHD9Yll1yi2bNn65JLLtGIESOUlpZmq4cWLVpo1KhROn36tGbOnKkOHTrolltu0e+//67ly5erqKhI999/v3766SctWrRIp06d0v3332/Lc/v27Wrbtq0eeOAB1a1bV0eOHLEdX48//rgaNWqkefPmaf/+/fxYAkAZr7cbN26sI0eOUBilYLxZRc2sP+M8dZ0n+Lph9Wce1NQDvGadHNLT0/XJJ59o4MCBeuqppxQUFKSSkhJt2LBBW7ZsUZcuXRQUFORSZh9++KFGjBihu+66SwMHDtSvv/6qr776Sh9++KFtnrNnz6qoqEj//Oc/9Yc//EElJSVavXq1QzBCknbt2qVOnTqpffv2uu6663TmzBnt2LFDN9xwg5KTk/Xpp5+6rIP1s/W7d999VyNHjlRycrKSk5P13Xffac+ePWrdurXLNm/btk2XX365+vfvrylTpkiSbZvXrl2r1q1be8zP24/u7t271a5dO/Xu3Vsmk0lZWVlavHixQ55JSUmaPHmyLc/169dr7dq1kmSrhyeeeEImk0mZmZkef8Sdt3/nzp1KSEhQjx491LNnT61fv94hIJGRkaGlS5e6pH/06FFbGkFBQapTp459tF/D31bbt2/XFVdc4bIdGzZssAUMQkNDddNNN+m5556TJJ07d06fffaZDh06ZCuLW2+9VSNGjNCpU6c0Z84cW95G33zzjdq1a6dTp05py5YtXo9n5/pZsmSJhg8frjvvvFPJycn69ddftWvXLlt9uNs2d+cIX/uA9fPu3bvVqlUrDRo0SIMGDVJWVpZt/c+ePau6deuqYcOGWr16tdLS0nTw4EHFxcXpL3/5i7Kzs/XTTz/5nZe79Vu5cqUaN26s66+/XjfccINt/1uyZInH856/+7ivbXv//fd12WWXqXv37urVq5dMJpOOHDmiL774QgcOHNCyZct055136h//+IeCgoJ0/vx5bdq0Sdu2bZMkrVmzRrfccoueffZZSdL333+vJUuWKCsrSwkJCS7rdfDgQaWlpalLly6aMWOGSkpK9L///U/t27dXUlKS5s2bp08//dRtntu3b5ck7dmzR4WFhYqNjdXXX3/tdV8CAHBDTcAAFRmMcGkhQSsJqIwtJKrrvvHnP/9ZISEh2rdvn3788Ue/lomMjFRkZKS++eYbffedvVwefvhhtW3bVjNnztSZM2fczuOsefPmCg0NDSh/d9tw0UUXaffu3X7N365dO1100UVKS0srdZ7u0vz5558dWmX4m+cf//hHJSYmqqioyCGgUF7++Mc/6s9//rO+++67Mqfftm1bXXTRRfr666/dll3btm1tN3+l0blzZ91///3atm2b3n777VKl0bRpUzVp0kTffvutTp06VeHHUNu2bfXzzz/bWnlUtiuuuEJXX321CgsLy33/8bVtvvJOSEhQSEiI0tLSdP78+TLvL02aNFHTpk291m1CQoKCg4P19ddfu+Q5ceJERUZG6rXXXlN2djY/bgBQARo1auT14QpAQMJDQIKgBGpLl42K2q+NAQnjE0jAX2PHjlVCQoLmzJmjvXv3UiAoN23atNGIESO0f/9+vf766xQIAIiABKALFIyQnLpsABxIZf+BsDaJd9f8mUAefLnqqqsUHx+vnJwcghEod3/5y190ySWXsG8BQAVeD5pMJrrBAX6qW5YDlZurWnd6pgj8cODAAZ0/f95tF42K/mHimKz+6tWrp71795a6uwfgzQ8//KDU1FSvY5MAAGMYAKiM1hEeu2zQbQPuNGwYoZMniygIiGAKAADc1IO3bABlDUj8f3i7gPC9baDaAAAAAElFTkSuQmCC"
+           alt="Ventana de Licencias de GymManager Lite: a la izquierda el formulario para crear una licencia nueva (cliente, tipo, dias de prueba, notas); a la derecha la tabla con todas las licencias emitidas y sus botones de accion (copiar clave, ver detalle, renovar, revocar, reactivar, liberar equipo)."
+           style="display:block;width:100%;height:auto">
+    </div>
+    <p class="win-caption">
+      <span class="tag">Captura real</span>
+      La tabla de la derecha ES el registro completo: se lee directamente de Firebase cada
+      vez que se abre o se pulsa &laquo;Actualizar&raquo;, as&iacute; que nunca se desincroniza. Seleccionar una
+      fila habilita renovar, revocar, reactivar o liberar el equipo &mdash; seg&uacute;n el estado en que est&eacute;.
+    </p>
+
+    <details style="margin-top:28px">
+      <summary style="cursor:pointer;font-weight:700;font-size:.92rem;color:var(--ink)">
+        Alternativa avanzada: l&iacute;nea de comandos
+      </summary>
+      <div style="margin-top:14px">
+        <p style="color:var(--ink-soft);font-size:.92rem">
+          <code class="inline">licensing_gui.py</code> y <code class="inline">licensing_cli.py</code>
+          hacen exactamente lo mismo &mdash;de hecho, comparten el mismo c&oacute;digo por dentro&mdash;, as&iacute; que
+          esto es solo para quien prefiera escribir el comando directamente.
+        </p>
+
+        <ol style="color:var(--ink-soft);font-size:.92rem;padding-left:1.3em;margin:0 0 4px">
+          <li style="margin-bottom:4px">Abre una terminal <b style="color:var(--ink)">en la carpeta ra&iacute;z del proyecto</b>
+            &mdash;la que contiene <code class="inline">vendor_tools</code>, no esa carpeta misma&mdash; (en el Explorador de
+            Windows: clic derecho sobre <code class="inline">gym lite</code> &rarr; &laquo;Abrir en Terminal&raquo;).</li>
+          <li>Pulsa el bot&oacute;n <b style="color:var(--ink)">&laquo;Copiar comando&raquo;</b> de abajo y p&eacute;galo &mdash; no copies a mano la
+            l&iacute;nea entera de la ventana negra, porque incluye la ruta de ejemplo y no es parte del comando.</li>
+        </ol>
+
+        <div class="note warn">
+          <span class="glyph">&#128013;</span>
+          <div><b>Si el comando no muestra nada y vuelve al mensaje de la terminal sin avisar de nada</b>,
+          es casi seguro que <code class="inline">python</code> apunta al accesito de Microsoft Store de
+          Windows en vez de a tu instalaci&oacute;n real &mdash; un problema conocido de Windows, no del programa.
+          Usa <code class="inline">py</code> en su lugar (el lanzador oficial de Python para Windows):
+          as&iacute; est&aacute;n escritos los comandos de este manual. Si esto sigue dando problemas, usa la
+          ventana de arriba &mdash; no necesita nada de esto.</div>
+        </div>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <span></span><span></span><span></span><span class="label">terminal &mdash; en la carpeta ra&iacute;z del proyecto</span>
+            <button type="button" class="copy-btn" data-copy='py vendor_tools/licensing_cli.py create --customer "Gimnasio Ejemplo" --tier MONTHLY'>&#128203; Copiar comando</button>
+          </div>
+          <pre><span class="p">F:\claude code\gym lite&gt; </span><span class="cmd">py vendor_tools/licensing_cli.py create</span> <span class="flag">--customer</span> <span class="str">"Gimnasio Ejemplo"</span> <span class="flag">--tier</span> MONTHLY
+
+<span class="out">Licencia creada para &laquo;Gimnasio Ejemplo&raquo;:
+  Clave:   <span class="k">GYML-8F2A-91C3-7B0E-44D1</span>
+  Tipo:    MONTHLY
+  Vence:   2026-09-11
+
+Entregue esta clave al cliente para que la active dentro del programa.</span></pre>
+        </div>
+
+        <div class="section-head" style="margin-top:32px">
+          <h3 style="font-size:1.05rem;margin:0 0 6px">Referencia de comandos</h3>
+          <p style="font-size:.9rem">Los mismos siete verbos cubren todo el ciclo de vida de una licencia &mdash; y son los mismos siete botones de la ventana.</p>
+        </div>
+        <div class="cmdgrid">
+          <div class="cmdrow"><code>create --customer --tier</code><div class="desc">Emite una licencia nueva y muestra la clave para entregar.</div></div>
+          <div class="cmdrow"><code>renew --key --months</code><div class="desc">Extiende el vencimiento. Nunca resta tiempo ya pagado, aunque se renueve antes de que venza.</div></div>
+          <div class="cmdrow"><code>revoke --key</code><div class="desc">La desactiva. El programa deja de funcionar en cuanto vuelva a conectarse (hasta 12&nbsp;h despu&eacute;s, o antes si el cliente reabre el programa estando en l&iacute;nea).</div></div>
+          <div class="cmdrow"><code>reactivate --key</code><div class="desc">Deshace una revocaci&oacute;n.</div></div>
+          <div class="cmdrow"><code>unbind --key</code><div class="desc">Libera el equipo asociado &mdash; para un reformateo leg&iacute;timo o un cambio de equipo autorizado.</div></div>
+          <div class="cmdrow"><code>inspect --key</code><div class="desc">Muestra el detalle completo de una licencia: tipo, estado, fechas, equipo activado.</div></div>
+          <div class="cmdrow"><code>list --status --tier</code><div class="desc">Lista todas las licencias, con filtros opcionales.</div></div>
+        </div>
+      </div>
+    </details>
+
+    <div class="note" style="margin-top:24px">
+      <span class="glyph">&#128274;</span>
+      <div><b>Esta herramienta tiene acceso administrador total a tu Firebase.</b>
+      Vive solo en tu equipo, nunca se comparte ni se sube a ning&uacute;n repositorio
+      p&uacute;blico &mdash; es justo lo que la separa de lo que s&iacute; recibe el cliente.</div>
+    </div>
+  </section>
+
+  <!-- ===================== 3. ACTIVAR ===================== -->
+  <section id="activar">
+    <div class="section-head">
+      <p class="section-kicker">03 · Para el cliente</p>
+      <h2>Activar la licencia en el programa</h2>
+      <p>La primera vez que abre GymManager Lite después de instalarlo, el
+      administrador tiene que escribir la clave que le entregaste. Necesita
+      internet en ese momento — después, no.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Inicia sesión</h3>
+          <p class="desc">Con el usuario y contraseña que trajo la instalación (o los que ya haya cambiado).</p>
+          <div class="browser">
+            <div class="browser-bar"><div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div><div class="browser-url">localhost — GymManager Lite</div></div>
+            <div class="browser-page" style="align-items:center">
+              <div class="app-card" style="width:220px;text-align:center">
+                <div style="font-size:1.6rem;margin-bottom:6px">🏋️</div>
+                <h4>GymManager Lite</h4>
+                <div class="sub">Inicia sesión para continuar</div>
+                <div class="app-field" style="text-align:left"><label>Usuario</label><div class="in filled">Admin</div></div>
+                <div class="app-field" style="text-align:left"><label>Contraseña</label><div class="in filled">••••••••</div></div>
+                <div class="app-btn">Iniciar sesión</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>El programa pide la licencia</h3>
+          <p class="desc">Sin una licencia usable, cualquier pantalla redirige aquí — un administrador ve el formulario; el resto del personal ve solo un aviso de que hay que esperar a que un administrador lo resuelva.</p>
+          <div class="browser">
+            <div class="browser-bar"><div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div><div class="browser-url">localhost/licencia/activar</div></div>
+            <div class="browser-page">
+              <div class="app-card">
+                <h4>Activar licencia</h4>
+                <div class="sub">GymManager Lite necesita una licencia válida para funcionar.</div>
+                <p style="font-size:.72rem;color:#475569;margin:0 0 12px">Escriba la clave de licencia que le entregó el proveedor.</p>
+                <div class="app-field"><label>Clave de licencia</label><div class="in">GYML-XXXX-XXXX-XXXX-XXXX</div></div>
+                <div class="app-btn">Activar</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Escribe la clave que le enviaste</h3>
+          <p class="desc">Tal cual la generó <code class="inline">licensing_cli.py create</code> — mayúsculas o minúsculas da igual, el programa la normaliza.</p>
+          <div class="browser">
+            <div class="browser-bar"><div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div><div class="browser-url">localhost/licencia/activar</div></div>
+            <div class="browser-page">
+              <div class="app-card">
+                <h4>Activar licencia</h4>
+                <div class="sub">GymManager Lite necesita una licencia válida para funcionar.</div>
+                <p style="font-size:.72rem;color:#475569;margin:0 0 12px">Escriba la clave de licencia que le entregó el proveedor.</p>
+                <div class="app-field"><label>Clave de licencia</label><div class="in filled">GYML-8F2A-91C3-7B0E-44D1</div></div>
+                <div class="app-btn">Activar</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>Listo — «Información del software»</h3>
+          <p class="desc">El programa consultó Firebase, confirmó la licencia y guardó una copia local firmada. Desde el menú, cualquier administrador puede volver a esta pantalla cuando quiera.</p>
+          <div class="browser">
+            <div class="browser-bar"><div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div><div class="browser-url">localhost/licencia/</div></div>
+            <div class="browser-page">
+              <div class="app-card">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <h4 style="margin:0">Licencia</h4>
+                  <span class="badge-mini ok">Activa</span>
+                </div>
+                <div class="deflist-mini">
+                  <div class="r"><span class="k">Tipo</span><span class="v" style="font-family:system-ui">Mensual</span></div>
+                  <div class="r"><span class="k">Clave</span><span class="v">GYML-8F2A-91C3-7B0E-44D1</span></div>
+                  <div class="r"><span class="k">Vence</span><span class="v">11/09/2026 15:40</span></div>
+                  <div class="r"><span class="k">Equipo</span><span class="v">42a2d878…</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note good">
+      <span class="glyph">✓</span>
+      <div><b>A partir de aquí, no depende de internet.</b> El programa revalida en
+      segundo plano cada 12 horas si hay conexión, y aguanta hasta 7 días seguidos
+      sin ella antes de volver a pedir que se conecte.</div>
+    </div>
+  </section>
+
+  <!-- ===================== 4. TIPOS DE LICENCIA ===================== -->
+  <section id="tipos">
+    <div class="section-head">
+      <p class="section-kicker">04 · Referencia</p>
+      <h2>Tipos de licencia y duración</h2>
+      <p>Se elige con <code class="inline">--tier</code> al crear la licencia. La
+      fecha de vencimiento se calcula sola desde ese momento, y se puede ajustar
+      con <code class="inline">--days</code> (solo en <code class="inline">create</code>)
+      o extender después con <code class="inline">renew</code>.</p>
+    </div>
+
+    <div class="tiers">
+      <div class="tier">
+        <div class="tname">🧪 Prueba</div>
+        <div class="tdur">15<small>días por defecto</small></div>
+        <div class="tuse">Para que un gimnasio interesado pruebe el programa antes de pagar. Se puede ajustar con <code class="inline">--days</code>.</div>
+        <div class="tcmd">--tier TRIAL --days 15</div>
+      </div>
+      <div class="tier">
+        <div class="tname">📅 Mensual</div>
+        <div class="tdur">30<small>días, renovable</small></div>
+        <div class="tuse">El plan de pago recurrente más común. Cada <code class="inline">renew --months 1</code> suma 30 días desde el vencimiento actual.</div>
+        <div class="tcmd">--tier MONTHLY</div>
+      </div>
+      <div class="tier">
+        <div class="tname">🗓️ Anual</div>
+        <div class="tdur">365<small>días, renovable</small></div>
+        <div class="tuse">Para clientes que pagan por adelantado todo el año, con descuento frente al plan mensual.</div>
+        <div class="tcmd">--tier ANNUAL</div>
+      </div>
+      <div class="tier perpetual">
+        <div class="tname">♾️ Perpetua</div>
+        <div class="tdur">∞<small>no vence</small></div>
+        <div class="tuse">Pago único, sin fecha de corte. Solo <code class="inline">revoke</code> la puede desactivar.</div>
+        <div class="tcmd">--tier PERPETUAL</div>
+      </div>
+    </div>
+
+    <div class="note">
+      <span class="glyph">💡</span>
+      <div><b>Renovar nunca hace perder tiempo ya pagado.</b> Si a una licencia
+      mensual le quedan 10 días y se renueva, el nuevo vencimiento se calcula
+      desde la fecha en que iba a vencer, no desde hoy.</div>
+    </div>
+  </section>
+
+  <!-- ===================== 5. ESTADOS ===================== -->
+  <section id="estados">
+    <div class="section-head">
+      <p class="section-kicker">05 · Cuando algo no cuadra</p>
+      <h2>Qué significa cada estado</h2>
+      <p>Se ve en «Información del software», dentro del programa. Sirve para
+      diagnosticar por teléfono sin tener que adivinar.</p>
+    </div>
+
+    <div class="states">
+      <div class="state-row"><span class="sname">ACTIVA</span><span class="pill ok">usable</span><span class="sdesc">Todo en orden — recién validada contra Firebase, o dentro de la ventana normal.</span></div>
+      <div class="state-row"><span class="sname">SIN CONEXIÓN</span><span class="pill ok">usable</span><span class="sdesc">No se pudo contactar a Firebase en el último intento, pero sigue dentro de los 7 días de gracia.</span></div>
+      <div class="state-row"><span class="sname">VENCIDA</span><span class="pill bad">bloquea</span><span class="sdesc">Pasó la fecha de vencimiento. Se resuelve con <code class="inline">renew</code> y volviendo a activar.</span></div>
+      <div class="state-row"><span class="sname">REVOCADA</span><span class="pill bad">bloquea</span><span class="sdesc">La desactivaste tú con <code class="inline">revoke</code>. Se resuelve con <code class="inline">reactivate</code>.</span></div>
+      <div class="state-row"><span class="sname">DATOS ALTERADOS</span><span class="pill bad">bloquea</span><span class="sdesc">El archivo local de la licencia no pasa su propia verificación. Pide reactivar con la clave de nuevo.</span></div>
+      <div class="state-row"><span class="sname">EQUIPO NO AUTORIZADO</span><span class="pill bad">bloquea</span><span class="sdesc">La licencia ya está atada a otro equipo. Se resuelve con <code class="inline">unbind</code> si el traslado es legítimo.</span></div>
+      <div class="state-row"><span class="sname">RELOJ SOSPECHOSO</span><span class="pill bad">bloquea</span><span class="sdesc">El reloj del equipo parece haber retrocedido. Pide reconectar a internet para resincronizar.</span></div>
+      <div class="state-row"><span class="sname">SIN CONEXIÓN — LÍMITE</span><span class="pill bad">bloquea</span><span class="sdesc">Ya pasaron los 7 días de gracia sin poder contactar a Firebase. Pide conectar el equipo.</span></div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>GymManager Lite — manual interno del proveedor</span>
+    <span>No distribuir junto con el instalador del cliente</span>
+  </div>
+
+</div>
+
+<script>
+  // execCommand primero, a propósito: en algunos entornos con permisos de
+  // portapapeles restringidos, la API moderna (navigator.clipboard.writeText)
+  // se queda esperando un permiso que nunca llega, y el botón parece no hacer
+  // nada. execCommand('copy') es síncrono y no depende de ese permiso.
+  document.querySelectorAll('.copy-btn').forEach(function (btn) {
+    var original = btn.textContent;
+    btn.addEventListener('click', function () {
+      var text = btn.getAttribute('data-copy') || '';
+      var area = document.createElement('textarea');
+      area.value = text;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(area);
+
+      if (!ok && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(function () { /* se avisa igual abajo */ });
+      }
+
+      btn.textContent = '✓ Copiado';
+      btn.classList.add('copied');
+      setTimeout(function () {
+        btn.textContent = original;
+        btn.classList.remove('copied');
+      }, 1600);
+    });
+  });
+</script>

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Información del software — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Información del software</h1>
+    <p class="muted">Estado de la licencia y datos generales de esta instalación.</p>
+  </div>
+
+  <div class="card stack">
+    <div class="row between">
+      <h2 style="margin:0">Licencia</h2>
+      <span class="badge {{ 'ok' if status.usable else 'fail' }}">{{ status.label }}</span>
+    </div>
+
+    <div class="deflist">
+      <div><span class="k">Tipo</span><span class="v">{{ status.tier_label }}</span></div>
+      <div><span class="k">Clave</span><span class="v">{{ status.license_key or '—' }}</span></div>
+      <div><span class="k">Fecha de activación</span>
+        <span class="v">{{ status.activated_at | fecha_licencia }}</span></div>
+      <div><span class="k">Fecha de vencimiento</span>
+        <span class="v">
+          {%- if status.tier == 'PERPETUAL' %}No vence
+          {%- else %}{{ status.expires_at | fecha_licencia }}{% endif %}
+        </span></div>
+      <div><span class="k">Última validación en línea</span>
+        <span class="v">{{ status.last_online_check | fecha_licencia }}</span></div>
+      {% if status.state == 'OFFLINE_GRACE' and status.grace_remaining_days is not none %}
+        <div><span class="k">Margen sin conexión</span>
+          <span class="v">Quedan {{ status.grace_remaining_days }} día(s) antes de exigir reconectar</span></div>
+      {% endif %}
+      <div><span class="k">Equipo autorizado</span>
+        <span class="v"><code>{{ device_fingerprint[:8] }}…</code>
+          <span class="tiny muted">(identificador de referencia para soporte)</span></span></div>
+    </div>
+
+    {% if current_user['role'] == 'ADMIN' %}
+      <div class="row tight">
+        <a class="btn btn-secondary" href="{{ url_for('licensing.activate') }}">
+          {{ 'Cambiar de licencia' if status.usable else 'Activar licencia' }}
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card stack">
+    <h2 style="margin:0">Programa</h2>
+    <div class="deflist">
+      <div><span class="k">Nombre</span><span class="v">GymManager Lite</span></div>
+      <div><span class="k">Versión</span><span class="v">{{ app_version }}</span></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,6 @@
+# Herramienta del VENDEDOR: nunca se instala en el entorno que empaqueta el
+# instalador (ver requirements.txt en la raíz, que es el que sí viaja al cliente).
+# firebase-admin necesita la clave de cuenta de servicio, que es un secreto que
+# jamás debe llegar al programa que se instala en el equipo de un cliente.
+firebase-admin>=6.5,<7.0
+click>=8.1

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Activar licencia — GymManager Lite{% endblock %}
+
+{% block content %}
+<div class="stack" style="max-width:560px;margin:0 auto">
+  <div>
+    <h1>Activar licencia</h1>
+    <p class="muted">GymManager Lite necesita una licencia válida para funcionar.</p>
+  </div>
+
+  {% if status.state == 'EXPIRED' %}
+    <div class="flash warning">
+      La licencia de este equipo venció. Escriba la misma clave para renovar los
+      datos si ya pagó, o contacte al proveedor para renovarla.
+    </div>
+  {% elif status.state == 'REVOKED' %}
+    <div class="flash error">
+      La licencia de este equipo fue revocada. Contacte al proveedor.
+    </div>
+  {% elif status.state == 'TAMPERED' %}
+    <div class="flash error">
+      Los datos de la licencia guardados en este equipo no son válidos. Active de
+      nuevo con su clave.
+    </div>
+  {% elif status.state == 'UNAUTHORIZED_DEVICE' %}
+    <div class="flash error">
+      Esta licencia está activada en otro equipo. Si va a trasladarla a este,
+      contacte al proveedor para liberarla primero.
+    </div>
+  {% elif status.state == 'CLOCK_TAMPER_SUSPECTED' %}
+    <div class="flash warning">
+      No se pudo confirmar la hora de este equipo. Conéctelo a internet para
+      resincronizar la licencia.
+    </div>
+  {% elif status.state == 'OFFLINE_GRACE_EXCEEDED' %}
+    <div class="flash warning">
+      Este equipo lleva demasiado tiempo sin conectarse a internet para revalidar
+      la licencia. Conéctelo para seguir usando el programa.
+    </div>
+  {% elif status.state == 'NOT_ACTIVATED' %}
+    <p class="muted">Escriba la clave de licencia que le entregó el proveedor.</p>
+  {% endif %}
+
+  <form method="post" class="card stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="field">
+      <span>Clave de licencia</span>
+      <input type="text" name="license_key" placeholder="GYML-XXXX-XXXX-XXXX-XXXX"
+             autocomplete="off" autofocus required style="text-transform:uppercase">
+    </label>
+    <button class="btn btn-primary btn-block">Activar</button>
+    <p class="tiny muted" style="margin:0">
+      Se necesita conexión a internet la primera vez. Después, el programa sigue
+      funcionando sin conexión durante un margen de días antes de pedir
+      reconectar.
+    </p>
+  </form>
+</div>
+{% endblock %}

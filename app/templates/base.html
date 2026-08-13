@@ -64,6 +64,10 @@
         <a href="{{ url_for('audit.index') }}" class="{{ 'active' if request.blueprint == 'audit' }}">
           <span>🕵️</span> Registro de actividad
         </a>
+        <a href="{{ url_for('licensing.info') }}" class="{{ 'active' if request.blueprint == 'licensing' }}">
+          <span>🪪</span> Información del software
+          {% if LICENSE_BADGE %}<span class="nav-off" title="{{ LICENSE_BADGE_TITLE }}">{{ LICENSE_BADGE }}</span>{% endif %}
+        </a>
       {% endif %}
       <div class="nav-sep">Mi cuenta</div>
       <a href="{{ url_for('users.profile') }}" class="{{ 'active' if request.endpoint == 'users.profile' }}">

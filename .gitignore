@@ -19,3 +19,8 @@ installer/assets/
 *.db-journal
 *.sqlite3
 .DS_Store
+
+# Herramienta del vendedor (vendor_tools/): la clave de cuenta de servicio de
+# Firebase es un secreto real y nunca debe comitearse ni empaquetarse.
+vendor_tools/serviceAccountKey.json
+vendor_tools/.venv/

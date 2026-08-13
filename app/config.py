@@ -8,6 +8,14 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+# Única fuente de verdad de la versión, en version.py (fuera de este paquete: ver
+# el porqué en ese archivo). Antes vivía duplicada como literal en
+# installer/build.py e installer/installer.py, con riesgo de desincronizarse.
+from version import APP_VERSION  # noqa: E402
+
 
 def _is_writable(directory: Path) -> bool:
     try:
@@ -119,6 +127,37 @@ MAX_FACE_COOLDOWN_SECONDS = 43_200
 # Nadie razonable entra más veces que esto en un día; sirve de tope defensivo por si
 # la cámara se queda mirando una foto pegada en la pared.
 MAX_ACCESS_LOGS_PER_DAY = 50
+
+# --- Licenciamiento (Firebase) ------------------------------------------------
+# El programa se vende a distintos gimnasios; cada instalación necesita su propia
+# licencia. Firebase es la fuente de verdad remota, pero el programa debe seguir
+# funcionando sin internet una vez validada: ver app/licensing.py.
+
+# El Web API key NO es un secreto —Firebase lo diseña para ir embebido en el
+# cliente—, la protección real la dan las reglas de seguridad de Firestore, no
+# ocultar esto (ver la colección `licenses` y sus reglas en contexto.md).
+FIREBASE_PROJECT_ID = "gestor-de-gym"
+FIREBASE_WEB_API_KEY = "AIzaSyD_09DfuWV58TTTUwzZojjLCqZfqj2_4j8"
+
+# Días que el programa sigue funcionando sin poder contactar a Firebase, contados
+# desde la última sincronización que sí tuvo éxito. Pasado este plazo, exige
+# reconectar: es lo que evita que una licencia revocada mientras el equipo está
+# desconectado siga dando acceso indefinidamente.
+OFFLINE_GRACE_DAYS = 7
+
+# Cada cuánto se intenta una sincronización en línea mientras el programa está en
+# uso. No es una espera fija: cada petición comprueba si ya toca y, si es así,
+# lo intenta sin bloquear al resto (ver _sync_lock en app/licensing.py).
+LICENSE_SYNC_INTERVAL_HOURS = 12
+
+# Margen que se tolera si el reloj del equipo parece haber retrocedido, para
+# absorber ajustes normales (cambio de huso horario, sincronización NTP) sin
+# tratarlos como manipulación. Por encima de esto, se sospecha del reloj.
+CLOCK_TOLERANCE_MINUTES = 5
+
+# Tiempo máximo de espera por una respuesta de Firebase. El programa no puede
+# quedarse colgado esperando red en un mostrador con un cliente delante.
+FIREBASE_TIMEOUT_SECONDS = 5.0
 
 # --- Vocabulario del dominio -------------------------------------------------
 
@@ -248,6 +287,8 @@ ACTION_LABELS = {
     "INDEX_RANGE_ADDED": "Rango de índice corporal añadido",
     "INDEX_RANGE_DELETED": "Rango de índice corporal eliminado",
     "INDEX_RANGES_RESTORED": "Rangos de índice corporal restaurados",
+    "LICENSE_ACTIVATED": "Licencia activada",
+    "LICENSE_ACTIVATION_FAILED": "Intento fallido de activar la licencia",
 }
 
 # Motivos del kiosco: el código que se guarda en access_logs.reason y el texto que se
