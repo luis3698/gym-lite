@@ -451,8 +451,10 @@ class App(tk.Tk):
         self.btn_detail.configure(state="normal")
         if d.get("status") == "ACTIVE":
             self.btn_revoke.configure(state="normal")
-            if d.get("tier") != "PERPETUAL":
-                self.btn_renew.configure(state="normal")
+            # También sirve para PERPETUAL: renovar ahora permite cambiar el tipo
+            # de licencia de paso, incluyendo convertir una perpetua en una con
+            # vencimiento (o al revés).
+            self.btn_renew.configure(state="normal")
         else:
             self.btn_reactivate.configure(state="normal")
             self.btn_delete.configure(state="normal")
@@ -507,38 +509,92 @@ class App(tk.Tk):
         pad = tk.Frame(top, bg=WHITE, padx=20, pady=16)
         pad.pack()
         tk.Label(pad, text=f"Renovar {d['license_key']}", bg=WHITE, fg=SLATE_900, font=self.font_bold).pack(anchor="w")
-        tk.Label(pad, text=f"Vence actualmente: {fecha(d.get('expires_at'))}", bg=WHITE, fg=SLATE_600, font=self.font_small).pack(
-            anchor="w", pady=(2, 12)
+        tk.Label(
+            pad,
+            text=f"Tipo actual: {lic.TIER_LABELS.get(d.get('tier'), d.get('tier'))}   ·   "
+                 f"Vence actualmente: {fecha(d.get('expires_at'))}",
+            bg=WHITE, fg=SLATE_600, font=self.font_small,
+        ).pack(anchor="w", pady=(2, 12))
+
+        tk.Label(pad, text="Tipo de licencia", bg=WHITE, font=self.font_small).pack(anchor="w", pady=(0, 2))
+        tier_var = tk.StringVar(value=lic.TIER_LABELS.get(d.get("tier"), ""))
+        combo_tier = ttk.Combobox(
+            pad, textvariable=tier_var, state="readonly", width=24,
+            values=[lic.TIER_LABELS[t] for t in TIER_ORDER],
         )
+        combo_tier.pack(anchor="w", pady=(0, 12))
 
         fila = tk.Frame(pad, bg=WHITE)
         fila.pack(anchor="w")
-        tk.Label(fila, text="Meses", bg=WHITE, font=self.font_small).grid(row=0, column=0, padx=(0, 6))
+        label_meses = tk.Label(fila, text="Meses", bg=WHITE, font=self.font_small)
+        label_meses.grid(row=0, column=0, padx=(0, 6))
         meses = tk.Entry(fila, width=6, font=self.font_body, relief="solid", bd=1)
         meses.insert(0, "1")
         meses.grid(row=0, column=1, padx=(0, 16))
-        tk.Label(fila, text="Años", bg=WHITE, font=self.font_small).grid(row=0, column=2, padx=(0, 6))
+        label_anos = tk.Label(fila, text="Años", bg=WHITE, font=self.font_small)
+        label_anos.grid(row=0, column=2, padx=(0, 6))
         anos = tk.Entry(fila, width=6, font=self.font_body, relief="solid", bd=1)
         anos.insert(0, "0")
         anos.grid(row=0, column=3)
 
+        nota = tk.Label(
+            pad, text="", bg=WHITE, fg=SLATE_600, font=self.font_small, wraplength=280, justify="left",
+        )
+        nota.pack(anchor="w", pady=(8, 0))
+
+        def tier_codigo_seleccionado() -> str:
+            etiqueta = tier_var.get()
+            for codigo, nombre in lic.TIER_LABELS.items():
+                if nombre == etiqueta:
+                    return codigo
+            return d.get("tier") or "MONTHLY"
+
+        def on_tier_change(_evt=None) -> None:
+            es_perpetua = tier_codigo_seleccionado() == "PERPETUAL"
+            estado = "disabled" if es_perpetua else "normal"
+            meses.configure(state=estado)
+            anos.configure(state=estado)
+            label_meses.configure(fg=(SLATE_400 if es_perpetua else SLATE_900))
+            label_anos.configure(fg=(SLATE_400 if es_perpetua else SLATE_900))
+            nota.configure(
+                text="Una licencia perpetua no vence: no hace falta indicar meses ni años."
+                if es_perpetua else ""
+            )
+
+        combo_tier.bind("<<ComboboxSelected>>", on_tier_change)
+        on_tier_change()
+
         def confirmar():
-            try:
-                m = int(meses.get() or 0)
-                a = int(anos.get() or 0)
-            except ValueError:
-                messagebox.showwarning("Valor inválido", "Meses y años deben ser números enteros.", parent=top)
-                return
+            tier_codigo = tier_codigo_seleccionado()
+            m = a = 0
+            if tier_codigo != "PERPETUAL":
+                try:
+                    m = int(meses.get() or 0)
+                    a = int(anos.get() or 0)
+                except ValueError:
+                    messagebox.showwarning("Valor inválido", "Meses y años deben ser números enteros.", parent=top)
+                    return
+                if m <= 0 and a <= 0:
+                    messagebox.showwarning(
+                        "Falta la duración", "Indique al menos un mes o un año a extender.", parent=top
+                    )
+                    return
+            # Solo se manda el tipo si de verdad cambió: así una renovación normal
+            # (sin tocar el combo) se comporta exactamente igual que antes.
+            tier_a_enviar = tier_codigo if tier_codigo != d.get("tier") else None
             top.destroy()
 
-            def terminado(nuevo_vencimiento, error):
+            def terminado(resultado, error):
                 if error is not None:
                     self._show_error("No se pudo renovar la licencia", error)
                     return
-                self.footer_label.configure(text=f"{d['license_key']} renovada hasta {fecha(nuevo_vencimiento)}.")
+                self.footer_label.configure(
+                    text=f"{d['license_key']} renovada: {lic.TIER_LABELS.get(resultado['tier'], resultado['tier'])}, "
+                         f"vence {fecha(resultado['expires_at'])}."
+                )
                 self._refresh()
 
-            self._run_async(lambda: lic.do_renovar(d["license_key"], m, a), terminado)
+            self._run_async(lambda: lic.do_renovar(d["license_key"], m, a, tier_a_enviar), terminado)
 
         ttk.Button(pad, text="Renovar", style="Primary.TButton", command=confirmar).pack(fill="x", pady=(16, 4))
         ttk.Button(pad, text="Cancelar", command=top.destroy).pack(fill="x")

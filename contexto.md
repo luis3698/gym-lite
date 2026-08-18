@@ -236,3 +236,28 @@ urgentes:
   integración HTTP completa (sin `GYMLITE_SKIP_LICENSE`) activando la
   licencia vía la vista real y navegando varias páginas con Firebase
   mockeado para fallar la prueba si se le llegaba a llamar.
+- 2026-08-18: pedido del usuario: al renovar una licencia desde
+  `vendor_tools/licensing_cli.py` / `licensing_gui.py`, también poder cambiar
+  su tipo (tier) de paso. `do_renovar(key, months, years, tier=None)` ahora
+  acepta un `tier` opcional: sin indicarlo, se comporta exactamente igual que
+  antes (compatibilidad hacia atrás). Indicándolo, cambia el tipo — incluye
+  convertir una PERPETUAL en una con vencimiento (usa "ahora" como base, ya
+  que no tenía `expires_at` del que partir) y al revés (pasar cualquier tipo a
+  PERPETUAL no pide meses/años, porque no hay vigencia que calcular). Cuando
+  se cambia de un tipo con vencimiento a otro (p. ej. MONTHLY → ANNUAL), la
+  nueva vigencia se sigue sumando sobre el vencimiento que ya tenía, no desde
+  hoy — nunca se resta tiempo ya pagado. Renovar una PERPETUAL SIN indicar
+  `tier` sigue bloqueado con el mismo aviso de siempre (nada que renovar).
+  Encontré y corregí un bug propio durante la verificación: el orden de las
+  comprobaciones hacía que "renovar sin --tier" en una licencia YA perpetua
+  calculara igual `nuevo_tier="PERPETUAL"` y cayera en la rama de éxito en vez
+  de avisar — se movió la comprobación de bloqueo antes de calcular
+  `nuevo_tier`. CLI: nueva opción `--tier` en `renew`. GUI: el botón
+  "Renovar…" ya no se deshabilita para licencias PERPETUAL, y el diálogo
+  suma un combo de tipo que deshabilita los campos de meses/años cuando se
+  elige "Perpetua". Verificado con Firestore simulado en memoria (7
+  escenarios: comportamiento previo intacto, cambio de tipo conservando
+  tiempo pagado, conversión a PERPETUAL sin duración, bloqueo de PERPETUAL
+  sin --tier, conversión desde PERPETUAL, tier inválido, clave inexistente) y
+  con la CLI real (`click.testing.CliRunner`) y la ventana de Tkinter
+  instanciada de verdad (incluida la interacción con el combo del diálogo).

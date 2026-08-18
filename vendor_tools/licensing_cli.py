@@ -15,6 +15,8 @@ las mismas reglas de negocio.
 Uso:
     py vendor_tools/licensing_cli.py create --customer "Gimnasio Ejemplo" --tier MONTHLY
     py vendor_tools/licensing_cli.py renew --key GYML-XXXX-XXXX-XXXX-XXXX --months 1
+    py vendor_tools/licensing_cli.py renew --key GYML-XXXX-XXXX-XXXX-XXXX --months 1 --tier ANNUAL
+    py vendor_tools/licensing_cli.py renew --key GYML-XXXX-XXXX-XXXX-XXXX --tier PERPETUAL
     py vendor_tools/licensing_cli.py revoke --key GYML-XXXX-XXXX-XXXX-XXXX
     py vendor_tools/licensing_cli.py reactivate --key GYML-XXXX-XXXX-XXXX-XXXX
     py vendor_tools/licensing_cli.py unbind --key GYML-XXXX-XXXX-XXXX-XXXX
@@ -132,17 +134,49 @@ def do_crear(customer: str, tier: str, days: int | None, notes: str) -> dict:
     return documento
 
 
-def do_renovar(key: str, months: int, years: int) -> datetime:
-    """Extiende el vencimiento de una licencia. Nunca resta tiempo ya pagado."""
-    if months <= 0 and years <= 0:
-        raise LicenseAdminError("Indique al menos un mes o un año a extender.")
+def do_renovar(key: str, months: int, years: int, tier: str | None = None) -> dict:
+    """Extiende el vencimiento de una licencia y, opcionalmente, cambia su tipo.
 
+    `tier` es opcional: sin indicarlo, se comporta como antes (solo extiende la
+    vigencia del tipo actual). Indicándolo, la licencia pasa a ese tipo —incluye
+    convertir una PERPETUAL en una con vencimiento, o al revés—. Nunca resta
+    tiempo ya pagado: si la licencia cambia de tipo pero conserva vencimiento
+    (p. ej. de MONTHLY a ANNUAL), la nueva vigencia se suma sobre el vencimiento
+    que ya tenía, no desde hoy.
+
+    Devuelve `{"tier": ..., "expires_at": ...}` con el estado ya actualizado.
+    """
     db = _db()
     licencia = _get_license(db, key)
     if licencia is None:
         raise LicenseAdminError(f"No existe ninguna licencia con la clave {key}.")
-    if licencia["tier"] == "PERPETUAL":
-        raise LicenseAdminError("Esta licencia es perpetua: no tiene vencimiento que renovar.")
+    if tier is not None and tier not in TIERS:
+        raise LicenseAdminError(f"Tipo de licencia inválido: {tier}.")
+
+    # Sin `tier` explícito, una licencia PERPETUAL sigue sin tener vencimiento que
+    # renovar (comportamiento de siempre). Con `tier` explícito sí se puede pasar
+    # de PERPETUAL a un tipo con vencimiento: el aviso ya no aplica en ese caso.
+    # Esta comprobación va ANTES de calcular `nuevo_tier`: si no, "sin --tier" en
+    # una licencia ya PERPETUAL calcularía nuevo_tier="PERPETUAL" igual y caería
+    # en la rama de abajo como si se hubiera pedido convertir a perpetua a
+    # propósito, en vez de avisar que no había nada que renovar.
+    if licencia["tier"] == "PERPETUAL" and tier is None:
+        raise LicenseAdminError(
+            "Esta licencia es perpetua: no tiene vencimiento que renovar. "
+            "Indique también --tier si quiere cambiarla a un tipo con vencimiento."
+        )
+
+    nuevo_tier = tier or licencia["tier"]
+
+    # Pasar a PERPETUAL no necesita meses/años: no hay vigencia que calcular, el
+    # vencimiento simplemente deja de existir.
+    if nuevo_tier == "PERPETUAL":
+        actualizacion = {"tier": "PERPETUAL", "expires_at": None}
+        db.collection("licenses").document(key).update(actualizacion)
+        return actualizacion
+
+    if months <= 0 and years <= 0:
+        raise LicenseAdminError("Indique al menos un mes o un año a extender.")
 
     actual = licencia.get("expires_at")
     base = max(_now(), actual) if actual else _now()
@@ -151,8 +185,11 @@ def do_renovar(key: str, months: int, years: int) -> datetime:
     # la aplicación (ver app/config.py), y aquí importa menos todavía: un día de
     # más o de menos en una renovación no afecta a nadie.
     nuevo_vencimiento = base + timedelta(days=months * 30 + years * 365)
-    db.collection("licenses").document(key).update({"expires_at": nuevo_vencimiento})
-    return nuevo_vencimiento
+    actualizacion: dict = {"expires_at": nuevo_vencimiento}
+    if tier is not None:
+        actualizacion["tier"] = tier
+    db.collection("licenses").document(key).update(actualizacion)
+    return {"tier": nuevo_tier, "expires_at": nuevo_vencimiento}
 
 
 def do_revocar(key: str) -> None:
@@ -251,13 +288,20 @@ def create(customer: str, tier: str, days: int | None, notes: str) -> None:
 @click.option("--key", required=True, help="Clave de licencia.")
 @click.option("--months", type=int, default=0, help="Meses a extender.")
 @click.option("--years", type=int, default=0, help="Años a extender.")
-def renew(key: str, months: int, years: int) -> None:
-    """Extiende el vencimiento de una licencia. Nunca resta tiempo ya pagado."""
+@click.option(
+    "--tier", type=click.Choice(TIERS), default=None,
+    help="Cambia el tipo de licencia de paso (opcional). Sin esto, conserva el tipo actual.",
+)
+def renew(key: str, months: int, years: int, tier: str | None) -> None:
+    """Extiende el vencimiento de una licencia y, opcionalmente, cambia su tipo."""
     try:
-        nuevo_vencimiento = do_renovar(key, months, years)
+        resultado = do_renovar(key, months, years, tier)
     except LicenseAdminError as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(f"Licencia {key} renovada. Nuevo vencimiento: {nuevo_vencimiento.strftime('%Y-%m-%d')}.")
+
+    vence = resultado["expires_at"]
+    vence_txt = vence.strftime("%Y-%m-%d") if vence else "No vence"
+    click.echo(f"Licencia {key} renovada. Tipo: {resultado['tier']}. Nuevo vencimiento: {vence_txt}.")
 
 
 @cli.command()
