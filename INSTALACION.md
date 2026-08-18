@@ -10,7 +10,9 @@ Guía para dejar el programa funcionando en un PC con Windows.
 
 Doble clic en **`GymManagerLite-Setup.exe`**.
 
-Es un único archivo: **no necesita Python, ni internet, ni permisos de administrador**.
+Es un único archivo: **no necesita Python ni permisos de administrador**. Sí necesita
+internet una vez, después de instalar, para **activar la licencia** (ver
+[Licenciamiento](#licenciamiento)).
 
 > Windows puede mostrar un aviso de SmartScreen porque el archivo no está firmado
 > digitalmente. Pulse **«Más información» → «Ejecutar de todas formas»**.
@@ -42,6 +44,10 @@ pequeña y, a continuación, el navegador con **dos pestañas**: el programa y e
 | Contraseña | `Admin.123` |
 
 > ⚠️ Cambie esa contraseña la primera vez, desde **Mi cuenta → Cambiar contraseña**.
+
+Antes de poder usar el programa, aparece la pantalla para **activar la licencia**: pida
+la clave al vendedor (empieza por `GYML-`), escríbala ahí y confirme. Necesita internet
+en ese momento. Vea [Licenciamiento](#licenciamiento) para los detalles.
 
 ### Paso 4 — Cargar los socios que ya tenía
 
@@ -83,10 +89,22 @@ En **Administración → Copias de seguridad** elija cada cuánto se hace la cop
 defecto, una al día al abrir el programa) y cuántas conservar. Las más antiguas se
 borran solas para no llenar el disco. También puede crear una a mano cuando quiera.
 
+### Qué contiene cada copia
+
+Cada copia es un único archivo **`.zip`** con **todo**: caja, transacciones, clientes,
+usuarios, devoluciones, registro de actividad — **y las fotos** de clientes, personal y
+productos. No hace falta llevar ninguna otra carpeta aparte para tener el respaldo
+completo. (La licencia de este equipo nunca viaja dentro de la copia, a propósito: así
+restaurarla en otro equipo no le regala la licencia.)
+
+> Copias más antiguas, hechas antes de que las fotos se incluyeran, siguen siendo
+> válidas y se pueden restaurar igual — solo que no traen fotos. Se marcan con la
+> insignia **«Sin fotos»** en la lista.
+
 ### Si pierde la base de datos
 
-En esa misma pantalla, **suba el archivo `.db`** que tenga guardado y pulse Restaurar.
-Antes de sustituir nada, el programa:
+En esa misma pantalla, **suba el archivo de copia** (`.zip`, o un `.db` antiguo si es de
+antes) que tenga guardado y pulse Restaurar. Antes de sustituir nada, el programa:
 
 1. Comprueba que el archivo es realmente una copia de GymManager Lite.
 2. Guarda una copia del estado actual, por si la restauración era un error.
@@ -96,9 +114,7 @@ Después tendrá que cerrar sesión y volver a entrar.
 
 > **Importante.** Las copias se guardan en la carpeta `data\backups` del propio equipo.
 > Eso no protege de que ese disco falle: **copie esa carpeta de vez en cuando a un USB o
-> a la nube**. Y recuerde que las fotos de clientes y las imágenes de productos son
-> archivos aparte, en `data\uploads`: si va a mudar el programa a otro equipo, lleve
-> también esa carpeta.
+> a la nube**.
 
 ---
 
@@ -269,6 +285,34 @@ ya registrados se conservan por si vuelve a activarlo.
 
 ---
 
+## Licenciamiento
+
+El programa necesita una licencia activa para funcionar. La clave se la entrega el
+vendedor (formato `GYML-XXXX-XXXX-XXXX-XXXX`) y se activa una sola vez, desde
+**Información del software** (o en la pantalla que aparece automáticamente si todavía
+no hay ninguna activada).
+
+| Tipo | Vence | Necesita internet después de activada |
+|---|---|---|
+| Prueba | Sí, corta | Sí, reconecta periódicamente |
+| Mensual | Sí | Sí, reconecta periódicamente |
+| Anual | Sí | Sí, reconecta periódicamente |
+| **Perpetua** | **No** | **No, nunca más** |
+
+Con las licencias que sí vencen, el programa reconecta a internet cada cierto tiempo
+para confirmar que sigue vigente, y si no hay conexión sigue funcionando igual **hasta
+7 días** sin poder reconectar. Pasado ese margen, exige volver a tener internet aunque
+la fecha de vencimiento todavía no haya llegado. Una licencia **perpetua** no tiene ese
+límite: una vez activada, deja de necesitar internet por completo para este tema —
+puede usarse en un equipo sin conexión permanente.
+
+La licencia queda atada a **este equipo**. Si necesita cambiarla de PC (reformateo,
+equipo nuevo), pida al vendedor que la libere antes de intentar activarla en el otro —
+de lo contrario el programa avisará que ese equipo no está autorizado.
+
+> **Información del software** muestra el tipo de licencia, cuándo se activó, cuándo
+> vence (si vence) y cuándo fue la última vez que se confirmó en línea.
+
 ## Uso diario
 
 - **Abrir:** doble clic en «GymManager Lite» (escritorio o menú Inicio).
@@ -294,7 +338,9 @@ Todo vive en la subcarpeta **`data`** de la carpeta de instalación:
 |---|---|
 | `data/gym.db` | Base de datos: clientes, inscripciones, ventas, usuarios, auditoría. |
 | `data/uploads/` | Fotos de clientes, personal y productos. |
+| `data/backups/` | Copias de seguridad (`.zip`), automáticas y manuales. |
 | `data/secret_key` | Clave con la que se firman las sesiones. |
+| `data/license.dat` y `data/license_key.bin` | Licencia activada de **este equipo** — nunca viaja dentro de una copia de seguridad. |
 
 > Si instala en una carpeta protegida por Windows (por ejemplo «Archivos de programa»),
 > los datos se guardan en `%LOCALAPPDATA%\GymManager Lite\data`. La ruta exacta siempre
@@ -312,6 +358,11 @@ reemplace esa carpeta y vuelva a abrir el programa.
 Copie `GymManagerLite-Setup.exe` al otro equipo y ejecútelo: instalará una base limpia.
 Si además quiere llevarse los datos, copie encima la carpeta `data` **después** de
 instalar, con el programa cerrado.
+
+> **La licencia no se transfiere así.** Aunque copie `data\license.dat`, el programa
+> comprueba que la licencia sea de *este* equipo y no del anterior — el nuevo PC pedirá
+> activar una licencia otra vez. Pida al vendedor que **libere el equipo** de la licencia
+> original antes de activarla en el nuevo (ver [Licenciamiento](#licenciamiento)).
 
 ---
 
@@ -353,7 +404,10 @@ borrarlos, que pide una confirmación adicional.
 | El kiosco dice «Otro programa está usando la cámara» | Ciérrelo (videollamadas, o el propio kiosco abierto en dos pestañas) y recargue. |
 | El kiosco no reconoce a un socio que sí está registrado | Añada otra muestra de su rostro desde la inscripción, con la luz y las gafas del día a día. Compruebe que la cámara no esté a contraluz. |
 | El kiosco no se abre solo al arrancar | El reconocimiento facial está desactivado. Actívelo en **Control de acceso**. |
-| Olvidé la contraseña de administrador | No hay recuperación por correo. Cierre el programa, borre `data\gym.db` y vuelva a abrirlo: se recrea con `Admin` / `Admin.123`, pero **se pierden todos los datos**. |
+| No se pudo activar la licencia / «Error de comunicación con Firebase» | Revise la conexión a internet: la activación siempre la necesita. |
+| «Este equipo no está autorizado» al activar | La licencia ya está activada en otro PC. Pida al vendedor que la libere antes de intentar de nuevo. |
+| El programa deja de funcionar y pide reconectar | Pasaron más de 7 días sin poder confirmar la licencia en línea (no aplica a licencias perpetuas). Conecte a internet y vuelva a abrir el programa. |
+| Olvidé la contraseña de administrador | No hay recuperación por correo. Cierre el programa, borre `data\gym.db` y vuelva a abrirlo: se recrea con `Admin` / `Admin.123`, pero **se pierden todos los datos** (la licencia activada no se ve afectada: vive en archivos aparte). |
 
 Si algo falla al arrancar, el detalle técnico queda en `data\error.log`.
 
@@ -366,8 +420,10 @@ Si algo falla al arrancar, el detalle técnico queda en `data\error.log`.
 - Cámara web, si quiere tomar la foto de los clientes desde el programa o usar el
   reconocimiento facial en la entrada.
 - Espacio en disco: unos 55 MB, más lo que ocupen las fotos.
+- Internet, una vez, para activar la licencia. Con una licencia perpetua no se vuelve
+  a necesitar después; con las demás, tolera hasta 7 días sin conexión.
 
-No requiere Python, ni conexión a internet, ni permisos de administrador.
+No requiere Python ni permisos de administrador.
 
 ---
 
