@@ -6,7 +6,12 @@
   <div class="row between">
     <div>
       <h1>Historial de ventas</h1>
-      <p class="muted">{{ sales | length }} venta(s) registrada(s) · Total {{ total | money }}</p>
+      <p class="muted">
+        {{ total_count }} venta(s) registrada(s) · Total {{ total | money }}
+        {% if total_count > max_rows %}
+          · mostrando las {{ max_rows }} más recientes
+        {% endif %}
+      </p>
     </div>
     <a class="btn btn-secondary" href="{{ url_for('sales.index') }}">← Volver</a>
   </div>

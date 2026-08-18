@@ -34,6 +34,17 @@
   repositorio, en `.gitignore`, nunca se empaqueta en el instalador.
 - `APP_VERSION` deja de estar duplicado en `installer/build.py` e
   `installer/installer.py`; pasa a vivir una sola vez en `app/config.py`.
+- **(2026-08-13, añadida después)** Las licencias `PERPETUAL` no vuelven a
+  sincronizar con Firebase después de activarse, nunca: no tienen
+  `expires_at` que vigilar, así que forzar una reconexión periódica solo
+  metería una dependencia de internet que ese tipo de licencia existe para
+  evitar. `evaluate_license()` corta el camino normal en cuanto ve
+  `tier == "PERPETUAL"` en el caché ya verificado localmente (firma y huella
+  del equipo siguen aplicando igual) y nunca llega a `_effective_now()`,
+  `_sync_due()` ni `_try_online_sync()`. Una revocación ya grabada en el
+  caché (`status_at_sync == "REVOKED"`) se sigue respetando —leer el archivo
+  local no es "conectarse a Firebase"—. `activate_license()` no cambia: la
+  primera activación sigue necesitando un contacto con Firebase.
 
 ## Estado actual
 
@@ -202,3 +213,26 @@ urgentes:
   quedó realmente activo (no cayó al respaldo de archivo plano) inspeccionando
   la firma del blob cifrado. Todas las licencias de prueba se eliminaron de
   Firestore al terminar. **Funcionalidad completa.**
+- 2026-08-13: pedido explícito del usuario: una licencia `PERPETUAL`, una vez
+  activada, no debe volver a necesitar conexión a internet ni a Firebase para
+  seguir validándose. Se agregó `_status_from_cache_perpetual()` en
+  `app/licensing.py` y un atajo temprano en `evaluate_license()` (justo
+  después de cargar y verificar el caché local, antes de cualquier cómputo de
+  reloj de confianza o intento de sincronización) que, para `tier ==
+  "PERPETUAL"`, devuelve `VALID` directamente sin pasar por
+  `_effective_now()`, `_sync_due()` ni `_try_online_sync()` — código de red
+  literalmente inalcanzable para ese tier, no una bandera que se salta. Se
+  conserva el respeto a una revocación ya grabada en el caché local
+  (`status_at_sync == "REVOKED"`) y las comprobaciones de manipulación/huella
+  del equipo de `load_cache()`, que no dependen de la red. TRIAL/MONTHLY/
+  ANNUAL no cambian. Se ajustó `app/templates/licensing/info.html` para que la
+  fila "Última validación en línea" muestre "No aplica (licencia perpetua)" en
+  vez de una fecha congelada para siempre. Verificado con scripts de humo
+  (sin suite persistida en el repo, mismo patrón de sesiones anteriores):
+  activación PERPETUAL simulada, sync forzado a "debido" sin que se llame a
+  Firebase, caché envejecido 37+ días sin caer en `OFFLINE_GRACE_EXCEEDED`,
+  revocación local respetada sin red, y comprobación de regresión de que
+  MONTHLY sigue sincronizando con normalidad. Además, una prueba de
+  integración HTTP completa (sin `GYMLITE_SKIP_LICENSE`) activando la
+  licencia vía la vista real y navegando varias páginas con Firebase
+  mockeado para fallar la prueba si se le llegaba a llamar.

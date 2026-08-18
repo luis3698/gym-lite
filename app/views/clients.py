@@ -6,6 +6,8 @@ de acceso, contraseña ni portal propio.
 
 from __future__ import annotations
 
+import sqlite3
+
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
 from ..config import (
@@ -17,6 +19,7 @@ from ..config import (
     MAX_HEIGHT_CM,
     MAX_MEASUREMENT_CM,
     MAX_WEIGHT_KG,
+    SEX_OPTIONS,
 )
 from ..db import execute, insert, query_all, query_one, query_value, transaction
 from ..helpers import (
@@ -57,6 +60,9 @@ def _read_form(form) -> dict:
 
     # Las listas cerradas se validan contra su catálogo: un <select> manipulado no debe
     # meter valores que después no encajen en los filtros ni en los informes.
+    sex = optional_string(form.get("sex"))
+    if sex and sex not in SEX_OPTIONS:
+        raise ValueError("Sexo inválido.")
     blood_type = optional_string(form.get("blood_type"))
     if blood_type and blood_type not in BLOOD_TYPES:
         raise ValueError("Tipo de sangre inválido.")
@@ -81,7 +87,7 @@ def _read_form(form) -> dict:
         "first_name": first_name,
         "last_name": last_name,
         "document_id": document_id,
-        "sex": optional_string(form.get("sex")),
+        "sex": sex,
         "age": age,
         "phone": optional_string(form.get("phone")),
         "email": email,
@@ -178,11 +184,19 @@ def create():
             now = now_str()
             columnas = ", ".join(CLIENT_FIELDS)
             marcadores = ", ".join("?" for _ in CLIENT_FIELDS)
-            client_id = insert(
-                f"""INSERT INTO clients ({columnas}, photo, created_at, updated_at)
-                    VALUES ({marcadores}, ?, ?, ?)""",
-                [data[c] for c in CLIENT_FIELDS] + [photo, now, now],
-            )
+            try:
+                client_id = insert(
+                    f"""INSERT INTO clients ({columnas}, photo, created_at, updated_at)
+                        VALUES ({marcadores}, ?, ?, ?)""",
+                    [data[c] for c in CLIENT_FIELDS] + [photo, now, now],
+                )
+            except sqlite3.IntegrityError:
+                # _check_duplicates no cierra la carrera: dos altas casi simultáneas
+                # con el mismo documento pueden pasarla las dos antes de que ninguna
+                # escriba. Sin este except, la segunda caía en un error 500 y la foto
+                # recién guardada quedaba huérfana en disco (nada la referenciaría).
+                delete_image(photo)
+                raise ValueError("Ya existe un cliente con ese número de identidad o ese correo.") from None
             audit("CLIENT_CREATED", data["document_id"])
             flash(f"Cliente {data['first_name']} {data['last_name']} registrado correctamente.", "success")
             return redirect(url_for("clients.detail", client_id=client_id))
@@ -234,10 +248,15 @@ def edit(client_id: int):
             _check_duplicates(data["document_id"], data["email"], exclude_id=client_id)
             photo, to_delete = resolve_captured_photo(client["photo"], request.form.get("photo_data"))
             asignaciones = ", ".join(f"{c} = ?" for c in CLIENT_FIELDS)
-            execute(
-                f"UPDATE clients SET {asignaciones}, photo = ?, updated_at = ? WHERE id = ?",
-                [data[c] for c in CLIENT_FIELDS] + [photo, now_str(), client_id],
-            )
+            try:
+                execute(
+                    f"UPDATE clients SET {asignaciones}, photo = ?, updated_at = ? WHERE id = ?",
+                    [data[c] for c in CLIENT_FIELDS] + [photo, now_str(), client_id],
+                )
+            except sqlite3.IntegrityError:
+                if photo != client["photo"]:
+                    delete_image(photo)
+                raise ValueError("Ya existe un cliente con ese número de identidad o ese correo.") from None
             # La foto anterior se borra solo después de que la fila se guardó bien.
             delete_image(to_delete)
             audit("CLIENT_UPDATED", data["document_id"])
@@ -291,8 +310,20 @@ def delete(client_id: int):
         )
         return redirect(url_for("clients.detail", client_id=client_id))
 
-    with transaction() as db:
-        db.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+    try:
+        with transaction() as db:
+            db.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+    except sqlite3.IntegrityError:
+        # Entre el conteo de arriba y este DELETE, otra sesión pudo registrar una
+        # inscripción o venta nueva para el cliente (la clave foránea no tiene
+        # ON DELETE): sin este except, eso caía en un error 500 en vez de un aviso
+        # normal.
+        flash(
+            "No se puede eliminar: se registró una inscripción o venta para este "
+            "cliente justo ahora. Actualice la página e inténtelo de nuevo.",
+            "error",
+        )
+        return redirect(url_for("clients.detail", client_id=client_id))
     delete_image(client["photo"])
     audit("CLIENT_DELETED", client["document_id"])
     flash(f"Cliente {client['first_name']} {client['last_name']} eliminado.", "success")

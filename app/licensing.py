@@ -34,6 +34,24 @@ que devuelva `evaluate_license()` —un fallo de red con caché existente cae al
 cálculo sin conexión, nunca bloquea por sí solo—; solo aparece como mensaje de
 `LicenseError` cuando se intenta activar por primera vez sin poder llegar a
 Firebase, que es el único caso donde no hay caché al que recurrir.
+
+## Licencias PERPETUAL
+
+Una licencia PERPETUAL nunca vence (`expires_at` es `None`, así la emite
+`vendor_tools/licensing_cli.py`), así que después de activarse no vuelve a
+sincronizar con Firebase nunca más: no hay fecha de vencimiento que vigilar, y
+forzar un resincronizado periódico solo introduciría una dependencia de
+internet que este tipo de licencia existe justamente para evitar.
+`evaluate_license()` corta el camino normal en cuanto ve `tier == "PERPETUAL"`
+en el caché ya verificado localmente (misma firma HMAC y misma comprobación de
+huella del equipo que cualquier otro tier) y nunca llega a `_effective_now()`,
+`_sync_due()` ni `_try_online_sync()` — no es una rama que se salta con una
+bandera, es código al que directamente no se llega. Lo único que se sigue
+respetando es una revocación ya grabada en el caché
+(`status_at_sync == "REVOKED"`), porque leer el archivo local firmado no es
+"conectarse a Firebase". `activate_license()` no cambia: la activación inicial
+sigue necesitando un contacto con Firebase, es la única forma de emitir la
+licencia y reclamar el equipo la primera vez.
 """
 
 from __future__ import annotations
@@ -357,7 +375,7 @@ def _sync_due() -> bool:
     )
 
 
-def _try_online_sync(license_key: str) -> str:
+def _try_online_sync(payload: dict[str, Any]) -> str:
     """Intenta refrescar contra Firebase sin bloquear al resto de peticiones.
 
     `threaded=True` en el servidor (ver gym_launcher.py) significa que dos
@@ -367,6 +385,7 @@ def _try_online_sync(license_key: str) -> str:
     petición que sí consiga el candado es la que actualiza el estado conocido.
     """
     global _last_sync_attempt
+    license_key = payload["license_key"]
     if not _sync_lock.acquire(blocking=False):
         return "skipped"
     try:
@@ -374,6 +393,22 @@ def _try_online_sync(license_key: str) -> str:
         id_token, _ = firebase_client.sign_in_anonymously()
         data, server_time = firebase_client.fetch_license(license_key, id_token)
         if data is None:
+            # Ya no existe en Firebase: se persiste como REVOKED en el caché firmado,
+            # no solo se devuelve en esta respuesta. Si no se guardara, la siguiente
+            # petición (antes de que vuelva a tocar sincronizar, hasta
+            # LICENSE_SYNC_INTERVAL_HOURS después) leería el caché viejo con
+            # status_at_sync="ACTIVE" y volvería a reportar VALID como si la
+            # revocación nunca se hubiera detectado.
+            save_cache(
+                {
+                    "license_key": license_key,
+                    "tier": payload.get("tier"),
+                    "status": "REVOKED",
+                    "expires_at": payload.get("expires_at"),
+                    "activated_at": payload.get("activated_at"),
+                },
+                server_time=server_time,
+            )
             return "not_found"
         firebase_client.claim_device(license_key, id_token, device_fingerprint_hash())
         save_cache(data, server_time=server_time)
@@ -424,6 +459,35 @@ def _status_from_cache(
     )
 
 
+def _status_from_cache_perpetual(payload: dict[str, Any]) -> LicenseStatus:
+    """Estado para PERPETUAL sin tocar la red ni el reloj.
+
+    Una licencia perpetua no vence y, tras activarse, no vuelve a sincronizar
+    jamás: por eso ninguna de las comprobaciones de `_status_from_cache()` que
+    dependen de un resincronizado periódico (vencimiento, margen sin conexión,
+    reloj sospechoso) tiene sentido aquí —todas asumen que `server_time_at_sync`
+    avanza con el tiempo, y para PERPETUAL se queda fija desde la activación a
+    propósito—. Lo único que sigue aplicando es leer `status_at_sync` del propio
+    caché firmado: eso no es una llamada a Firebase, es leer un archivo local que
+    ya pasó `load_cache()`, y es la única forma en que una revocación (grabada en
+    algún sync anterior a este atajo, o si se reactiva la licencia más adelante)
+    sigue bloqueando el programa.
+    """
+    tier = payload.get("tier")
+    license_key = payload.get("license_key")
+    device_fp = payload.get("device_fingerprint_hash")
+
+    if payload.get("status_at_sync") == "REVOKED":
+        return LicenseStatus(REVOKED, tier=tier, license_key=license_key, device_fingerprint=device_fp)
+
+    return LicenseStatus(
+        VALID, tier=tier, expires_at=payload.get("expires_at"),
+        activated_at=payload.get("activated_at"), license_key=license_key,
+        last_online_check=payload.get("server_time_at_sync"),
+        grace_remaining_days=None, device_fingerprint=device_fp,
+    )
+
+
 def evaluate_license() -> LicenseStatus:
     """Punto de entrada único: qué puede hacer el programa ahora mismo."""
     global _last_sync_ok
@@ -435,13 +499,16 @@ def evaluate_license() -> LicenseStatus:
     payload = result.data
     assert payload is not None  # result.state es None solo cuando data está presente
 
+    if payload.get("tier") == "PERPETUAL":
+        return _status_from_cache_perpetual(payload)
+
     effective_now, clock_suspect = _effective_now(payload)
     if clock_suspect:
         return LicenseStatus(CLOCK_TAMPER_SUSPECTED, tier=payload.get("tier"), license_key=payload.get("license_key"))
 
     online_ok = _last_sync_ok
     if _sync_due():
-        outcome = _try_online_sync(payload["license_key"])
+        outcome = _try_online_sync(payload)
         if outcome == "not_found":
             # Estaba en el caché pero ya no existe en Firebase: se trata como
             # revocada, no como un fallo de comunicación.

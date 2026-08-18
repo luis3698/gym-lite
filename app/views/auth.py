@@ -53,7 +53,7 @@ def login():
             return render_template("login.html", username=username), 400
 
         user = query_one(
-            "SELECT id, username, password_hash, failed_attempts, locked_until FROM users WHERE username = ?",
+            "SELECT id, username, password_hash, locked_until FROM users WHERE username = ?",
             (username,),
         )
 
@@ -72,13 +72,13 @@ def login():
             return render_template("login.html", username=username), 423
 
         if not verify_password(user["password_hash"], password):
-            lock_message = register_failed_attempt(user["id"], user["failed_attempts"])
+            lock_message = register_failed_attempt(user["id"])
             audit("LOGIN_FAILED", "contraseña incorrecta", success=False, user_id=user["id"])
             flash(lock_message or "Usuario o contraseña incorrectos.", "error")
             return render_template("login.html", username=username), 401
 
         clear_failed_attempts(user["id"])
-        login_user(user["id"])
+        login_user(user["id"], user["password_hash"])
         audit("LOGIN_SUCCESS", user_id=user["id"])
         return redirect(_safe_next(request.args.get("next")))
 

@@ -28,7 +28,7 @@ from ..config import (
     MAX_FACES_PER_CLIENT,
     MIN_FACE_COOLDOWN_SECONDS,
 )
-from ..db import execute, insert, query_all, query_one, query_value, transaction
+from ..db import execute, query_all, query_one, query_value, transaction
 from ..faces import (
     InvalidDescriptor,
     best_match,
@@ -219,18 +219,40 @@ def last_entry():
 # --- Identificación -----------------------------------------------------------
 
 
-def _client_card(client_id: int) -> dict:
-    """Ficha que se pinta a la derecha de la cámara."""
+def _client_card(client_id: int, reason: str | None = None) -> dict:
+    """Ficha que se pinta a la derecha de la cámara.
+
+    `reason` es el motivo que ya decidió `_decide()`: la membresía que se muestra debe
+    ser la que explica ese motivo, no simplemente "la de vencimiento más lejano". Un
+    cliente puede tener a la vez una inscripción larga en pausa (vencimiento lejano) y
+    otra corta vigente; sin distinguir el motivo, el panel podía mostrar "vence el
+    [fecha lejana de la pausada]" mientras el acceso se concedía por la vigente.
+    """
     client = query_one("SELECT * FROM clients WHERE id = ?", (client_id,))
     if client is None:
         return {}
 
-    membership = query_one(
-        """SELECT duration_type, quantity, start_date, end_date, paused_at
-             FROM memberships WHERE client_id = ?
-            ORDER BY end_date DESC, id DESC LIMIT 1""",
-        (client_id,),
-    )
+    if reason == "ACTIVE":
+        membership = query_one(
+            f"""SELECT duration_type, quantity, start_date, end_date, paused_at
+                 FROM memberships WHERE client_id = ? AND {active_membership_sql()}
+                ORDER BY end_date DESC, id DESC LIMIT 1""",
+            (client_id, today_str()),
+        )
+    elif reason == "PAUSED":
+        membership = query_one(
+            """SELECT duration_type, quantity, start_date, end_date, paused_at
+                 FROM memberships WHERE client_id = ? AND paused_at IS NOT NULL
+                ORDER BY end_date DESC, id DESC LIMIT 1""",
+            (client_id,),
+        )
+    else:
+        membership = query_one(
+            """SELECT duration_type, quantity, start_date, end_date, paused_at
+                 FROM memberships WHERE client_id = ?
+                ORDER BY end_date DESC, id DESC LIMIT 1""",
+            (client_id,),
+        )
     status, days_left = membership_status(
         membership["end_date"] if membership else None,
         membership["paused_at"] if membership else None,
@@ -309,6 +331,15 @@ def _visits_today(client_id: int) -> int:
     )
 
 
+def _last_reason(client_id: int) -> str | None:
+    """Motivo del último paso registrado de este cliente, o None si nunca pasó."""
+    return query_value(
+        """SELECT reason FROM access_logs WHERE client_id = ?
+            ORDER BY created_at DESC, id DESC LIMIT 1""",
+        (client_id,),
+    )
+
+
 @bp.post("/identificar")
 def identify():
     """Recibe un descriptor y responde con la ficha y la decisión de acceso.
@@ -347,6 +378,13 @@ def identify():
     elapsed = _seconds_since_last(client_id)
     within_cooldown = elapsed is not None and elapsed < face_cooldown_seconds()
 
+    # El motivo cambió respecto al último registro (p. ej. pagó en mostrador mientras
+    # seguía delante de la cámara: EXPIRED pasa a ACTIVE) — se registra igual, aunque
+    # siga dentro del antirrebote, para que el panel del personal y el histórico
+    # reflejen el cambio real y no sigan mostrando el estado viejo el resto del rato.
+    if within_cooldown and _last_reason(client_id) != reason:
+        within_cooldown = False
+
     # Antirrebote: quien sigue plantado delante de la cámara no genera una entrada
     # nueva cada segundo. Se le sigue enseñando su ficha, marcada como ya registrada.
     #
@@ -361,13 +399,26 @@ def identify():
         with transaction() as db:
             elapsed = _seconds_since_last(client_id)
             within_cooldown = elapsed is not None and elapsed < face_cooldown_seconds()
-            if not within_cooldown and _visits_today(client_id) < MAX_ACCESS_LOGS_PER_DAY:
-                db.execute(
-                    """INSERT INTO access_logs (client_id, allowed, reason, distance, created_at)
-                       VALUES (?, ?, ?, ?, ?)""",
-                    (client_id, 1 if allowed else 0, reason, round(distance, 4), now_str()),
-                )
-                elapsed = 0
+            if within_cooldown and _last_reason(client_id) != reason:
+                within_cooldown = False
+            if not within_cooldown:
+                if _visits_today(client_id) < MAX_ACCESS_LOGS_PER_DAY:
+                    db.execute(
+                        """INSERT INTO access_logs (client_id, allowed, reason, distance, created_at)
+                           VALUES (?, ?, ?, ?, ?)""",
+                        (client_id, 1 if allowed else 0, reason, round(distance, 4), now_str()),
+                    )
+                    elapsed = 0
+                else:
+                    # Tope diario alcanzado: no se inserta más, pero se trata como si
+                    # ya estuviera en antirrebote el resto del día. Si no, el último
+                    # registro real (el del tope, de hace rato) hacía que cada
+                    # fotograma siguiente volviera a ver "no está en antirrebote",
+                    # reabriendo una transacción de escritura sin insertar nada — y
+                    # el aviso de "ya registrado" dejaba de mostrarse justo cuando
+                    # más hacía falta (alguien insistiendo delante de la cámara).
+                    within_cooldown = True
+                    elapsed = 0
 
     return jsonify({
         "ok": True,
@@ -379,7 +430,7 @@ def identify():
         "repeat": within_cooldown,
         "seconds_since": elapsed,
         "visits_today": _visits_today(client_id),
-        "client": _client_card(client_id),
+        "client": _client_card(client_id, reason),
     })
 
 
@@ -412,8 +463,7 @@ def enroll(client_id: int):
         flash("No se recibió ninguna muestra de rostro.", "error")
         return back
 
-    free_slots = MAX_FACES_PER_CLIENT - client_face_count(client_id)
-    if free_slots <= 0:
+    if client_face_count(client_id) >= MAX_FACES_PER_CLIENT:
         flash(
             f"Este cliente ya tiene {MAX_FACES_PER_CLIENT} muestras de rostro, el máximo. "
             "Elimine las actuales para volver a capturarlas.",
@@ -422,7 +472,7 @@ def enroll(client_id: int):
         return back
 
     try:
-        descriptors = [parse_descriptor(item) for item in batch[:free_slots]]
+        descriptors = [parse_descriptor(item) for item in batch]
     except InvalidDescriptor as exc:
         flash(f"No se pudo registrar el rostro: {exc}", "error")
         return back
@@ -440,17 +490,36 @@ def enroll(client_id: int):
         return back
 
     now = now_str()
-    for descriptor in descriptors:
-        insert(
-            "INSERT INTO client_faces (client_id, descriptor, created_at) VALUES (?, ?, ?)",
-            (client_id, serialize_descriptor(descriptor), now),
-        )
+    with transaction() as db:
+        # El hueco disponible se recuenta aquí dentro, con el bloqueo de escritura ya
+        # tomado: dos envíos casi simultáneos del mismo formulario (doble clic,
+        # reintento tras un timeout de red) podían leer los dos "quedan huecos libres"
+        # antes de que ninguno insertara, y el cliente terminaba con más de
+        # MAX_FACES_PER_CLIENT muestras guardadas.
+        current = db.execute(
+            "SELECT COUNT(*) FROM client_faces WHERE client_id = ?", (client_id,)
+        ).fetchone()[0]
+        free_slots = max(0, MAX_FACES_PER_CLIENT - current)
+        guardados = descriptors[:free_slots]
+        for descriptor in guardados:
+            db.execute(
+                "INSERT INTO client_faces (client_id, descriptor, created_at) VALUES (?, ?, ?)",
+                (client_id, serialize_descriptor(descriptor), now),
+            )
     invalidate_gallery()
 
+    if not guardados:
+        flash(
+            f"Este cliente ya tiene {MAX_FACES_PER_CLIENT} muestras de rostro, el máximo. "
+            "Elimine las actuales para volver a capturarlas.",
+            "warning",
+        )
+        return back
+
     total = client_face_count(client_id)
-    audit("FACE_ENROLLED", f"cliente {client['document_id']} - {len(descriptors)} muestra(s)")
+    audit("FACE_ENROLLED", f"cliente {client['document_id']} - {len(guardados)} muestra(s)")
     flash(
-        f"{len(descriptors)} muestra(s) registrada(s). "
+        f"{len(guardados)} muestra(s) registrada(s). "
         f"El cliente tiene {total} de {MAX_FACES_PER_CLIENT}.",
         "success",
     )

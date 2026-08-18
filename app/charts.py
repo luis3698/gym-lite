@@ -111,8 +111,11 @@ def _render(
 
     count = len(points)
     slot = plot_w / count
-    # Con 12 meses no caben todas las etiquetas del eje X sin solaparse.
-    label_step = max(1, count // 7)
+    # Con 12 meses no caben todas las etiquetas del eje X sin solaparse. División hacia
+    # arriba (no entera): con división entera, count // 7 da 1 para count=12 —justo el
+    # caso de los gráficos de 12 meses del dashboard— y no se adelgazaba ninguna
+    # etiqueta pese a lo que dice este comentario.
+    label_step = max(1, -(-count // 7))
 
     if kind == "bar":
         bar_w = min(38.0, slot * 0.6)

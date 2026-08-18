@@ -101,6 +101,9 @@
                   {% else %}
                     <span class="badge none">Manual</span>
                   {% endif %}
+                  {% if c.legacy %}
+                    <span class="badge none" title="Copia de antes de incluir fotos: al restaurarla no se recuperan las imágenes.">Sin fotos</span>
+                  {% endif %}
                 </td>
                 <td class="right nowrap">
                   <div class="row tight" style="justify-content:flex-end">
@@ -157,8 +160,8 @@
           enctype="multipart/form-data" class="row" style="align-items:flex-end">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label class="field" style="flex:1;min-width:220px">
-        <span>Archivo de copia (.db)</span>
-        <input type="file" name="archivo" accept=".db" required>
+        <span>Archivo de copia (.zip)</span>
+        <input type="file" name="archivo" accept=".zip,.db" required>
       </label>
       <label class="field" style="min-width:200px">
         <span>Su contraseña</span>
@@ -170,12 +173,12 @@
 
   <div class="notice">
     <strong>Qué pasa al restaurar.</strong> Es una sustitución completa: TODO el contenido
-    de la base vuelve a como estaba en la copia —clientes, inscripciones, ventas,
-    productos, devoluciones, rostros, ajustes y registro de actividad—, no solo una
-    parte. Las fotos de los clientes
-    y las imágenes de los productos <strong>no</strong> están dentro de la base —son
-    archivos aparte en la carpeta <code>uploads</code>—, así que si restaura en un equipo
-    distinto conviene copiar también esa carpeta.
+    vuelve a como estaba en la copia —clientes, inscripciones, ventas, productos,
+    devoluciones, rostros, ajustes, registro de actividad y las fotos de clientes,
+    personal y productos—, no solo una parte.
+    <br><br>
+    Las copias con la insignia <strong>«Sin fotos»</strong> son de antes de que las
+    imágenes se incluyeran: restaurarlas trae los datos pero no las fotos.
     <br><br>
     Después de restaurar tendrá que cerrar sesión y volver a entrar, porque su sesión
     pertenece a la base anterior.

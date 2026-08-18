@@ -18,6 +18,11 @@ from __future__ import annotations
 
 import csv
 import io
+import json
+import re
+import secrets
+from datetime import datetime
+from pathlib import Path
 
 from flask import (
     Blueprint,
@@ -31,7 +36,7 @@ from flask import (
     url_for,
 )
 
-from ..config import BLOOD_TYPES, MAX_MEMBERSHIP_QUANTITY, SEX_OPTIONS, VALID_DURATIONS
+from ..config import BLOOD_TYPES, INSTANCE_DIR, MAX_MEMBERSHIP_QUANTITY, SEX_OPTIONS, VALID_DURATIONS
 from ..db import query_one, query_value, transaction
 from ..helpers import (
     DATE_FMT,
@@ -65,8 +70,63 @@ CSV_COLUMNS = (
     ("vencimiento", "Vencimiento (AAAA-MM-DD, opcional)", False),
 )
 
-PREVIEW_KEY = "migracion_previa"
 MAX_CSV_ROWS = 2000
+
+# La previsualización (hasta MAX_CSV_ROWS filas, ~12 campos cada una) NO se guarda en
+# la cookie de sesión: Flask firma la sesión pero la sigue mandando entera dentro de la
+# cookie, y un navegador la trunca o la descarta por encima de ~4 KB —apenas 15-20
+# filas—. Por encima de eso, `confirm()` recibía la sesión vacía y la importación se
+# perdía en silencio justo en el caso de uso que este módulo anuncia soportar
+# (migraciones masivas). Se guarda en un archivo aparte y en la cookie solo va el
+# nombre de ese archivo (un token, unos pocos bytes).
+PREVIEW_TOKEN_KEY = "migracion_previa_token"
+PREVIEW_DIR = INSTANCE_DIR / "tmp" / "migracion"
+PREVIEW_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+# Por si el flujo se abandona a medias (se sube un CSV y nunca se confirma ni se
+# vuelve a intentar): sin esto, cada intento abandonado dejaría un archivo suelto.
+PREVIEW_MAX_AGE_HOURS = 6
+
+
+def _preview_path(token: str | None) -> Path | None:
+    if not token or not PREVIEW_TOKEN_RE.match(token):
+        return None
+    return PREVIEW_DIR / f"{token}.json"
+
+
+def _cleanup_stale_previews() -> None:
+    if not PREVIEW_DIR.is_dir():
+        return
+    limite = datetime.now().timestamp() - PREVIEW_MAX_AGE_HOURS * 3600
+    for archivo in PREVIEW_DIR.glob("*.json"):
+        try:
+            if archivo.stat().st_mtime < limite:
+                archivo.unlink()
+        except OSError:
+            continue
+
+
+def _save_preview(rows: list[dict]) -> str:
+    PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    _cleanup_stale_previews()
+    token = secrets.token_hex(16)
+    _preview_path(token).write_text(json.dumps(rows), encoding="utf-8")
+    return token
+
+
+def _load_preview(token: str | None) -> list[dict]:
+    path = _preview_path(token)
+    if path is None or not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
+def _discard_preview(token: str | None) -> None:
+    path = _preview_path(token)
+    if path is not None:
+        path.unlink(missing_ok=True)
 
 
 # --- Alta de una fila ---------------------------------------------------------
@@ -308,6 +368,9 @@ def analyze():
     if error:
         flash(error, "warning")
 
+    # Una nueva subida reemplaza cualquier previsualización pendiente de antes.
+    _discard_preview(session.get(PREVIEW_TOKEN_KEY))
+
     vistos: set[str] = set()
     previa = []
     validas = 0
@@ -337,8 +400,11 @@ def analyze():
             } if not errores else None,
         })
 
-    session[PREVIEW_KEY] = [p["datos"] for p in previa if p["datos"]]
-    session.modified = True
+    datos_validos = [p["datos"] for p in previa if p["datos"]]
+    if datos_validos:
+        session[PREVIEW_TOKEN_KEY] = _save_preview(datos_validos)
+    else:
+        session.pop(PREVIEW_TOKEN_KEY, None)
 
     return render_template(
         "migration/preview.html",
@@ -352,8 +418,10 @@ def analyze():
 @bp.post("/confirmar")
 @roles_required("ADMIN")
 def confirm():
-    pendientes = session.get(PREVIEW_KEY) or []
+    token = session.get(PREVIEW_TOKEN_KEY)
+    pendientes = _load_preview(token)
     if not pendientes:
+        session.pop(PREVIEW_TOKEN_KEY, None)
         flash("No hay nada pendiente de importar. Vuelva a subir el archivo.", "warning")
         return redirect(url_for("migration.index"))
 
@@ -371,7 +439,8 @@ def confirm():
         listas.append(limpio)
 
     if not listas:
-        session.pop(PREVIEW_KEY, None)
+        _discard_preview(token)
+        session.pop(PREVIEW_TOKEN_KEY, None)
         flash("Ninguna fila se pudo importar: es posible que ya existieran.", "error")
         return redirect(url_for("migration.index"))
 
@@ -380,7 +449,8 @@ def confirm():
         for limpio in listas:
             _insert_row(db, limpio)
 
-    session.pop(PREVIEW_KEY, None)
+    _discard_preview(token)
+    session.pop(PREVIEW_TOKEN_KEY, None)
     audit("MIGRATION_IMPORT", f"{len(listas)} socio(s) importados")
 
     mensaje = f"{len(listas)} socio(s) importados con su inscripción. No se generó ningún recibo."

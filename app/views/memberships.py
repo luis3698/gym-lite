@@ -181,7 +181,7 @@ def manage(client_id: int):
 
     if request.method == "POST":
         try:
-            membership_id = _create_membership(client, request.form, tariffs)
+            membership_id = _create_membership(client, request.form)
             flash("Inscripción registrada correctamente.", "success")
             return redirect(url_for("memberships.receipt", membership_id=membership_id))
         except ValueError as exc:
@@ -214,7 +214,7 @@ def manage(client_id: int):
     )
 
 
-def _create_membership(client, form, tariffs) -> int:
+def _create_membership(client, form) -> int:
     duration = optional_string(form.get("duration_type"))
     if duration not in VALID_DURATIONS:
         raise ValueError("Tipo de inscripción inválido.")
@@ -235,21 +235,28 @@ def _create_membership(client, form, tariffs) -> int:
     if start is None:
         raise ValueError("La fecha de inicio no es válida (formato esperado: AAAA-MM-DD).")
 
-    base_price = compute_base_price(duration, quantity, tariffs)
-
-    # Los precios de los servicios se releen de la base, nunca se toman del formulario:
-    # si no, bastaría con manipular el POST para cobrarse un servicio a cero.
     selected_ids = {
         int(v) for v in form.getlist("service_ids") if str(v).isdigit()
     }
-    chosen = [s for s in tariffs["services"] if s["id"] in selected_ids]
-    services_total = sum(s["price"] for s in chosen)
 
     end = compute_end_date(start, duration, quantity)
-    total = round(base_price + services_total, 2)
     now = now_str()
 
     with transaction() as db:
+        # Las tarifas se releen aquí dentro, con el bloqueo de escritura ya tomado: las
+        # de `tariffs` (cargadas al pintar la pantalla) pudieron quedar obsoletas si un
+        # administrador las cambió mientras el formulario estaba abierto. Mismo motivo
+        # por el que sales.py relee el precio del producto dentro de su transacción.
+        tariffs = _load_tariffs()
+        base_price = compute_base_price(duration, quantity, tariffs)
+
+        # Los precios de los servicios se releen de la base, nunca se toman del
+        # formulario: si no, bastaría con manipular el POST para cobrarse un servicio
+        # a cero.
+        chosen = [s for s in tariffs["services"] if s["id"] in selected_ids]
+        services_total = sum(s["price"] for s in chosen)
+        total = round(base_price + services_total, 2)
+
         cur = db.execute(
             """INSERT INTO memberships (client_id, sold_by_id, duration_type, quantity, start_date,
                                         end_date, base_price, services_total, total,
@@ -366,11 +373,31 @@ def cancel(membership_id: int):
     Mientras el registro exista, la clave foránea impide eliminar al cliente. Se
     permite cancelar tanto las vigentes como las vencidas: si solo se pudiera con las
     vigentes, un cliente con inscripción vencida quedaría imposible de borrar.
+
+    Si ya se registró una devolución sobre esta inscripción, cancelar (borrar la fila)
+    la dejaría fuera del reporte de ingresos mientras la devolución seguiría contando
+    contra ella: la caja del día cuadraría mal para siempre, sin forma de rastrear por
+    qué. `refunds` no tiene clave foránea hacia `memberships` a propósito (apunta
+    también a `sales`), así que nada más lo impide. Igual que una venta con ventas
+    asociadas, una inscripción con una devolución ya es histórico contable y no se
+    borra: por eso también bloquea el borrado del cliente en `clients.delete`.
     """
     membership = query_one("SELECT * FROM memberships WHERE id = ?", (membership_id,))
     if membership is None:
         flash("Inscripción no encontrada.", "error")
         return redirect(url_for("memberships.index"))
+
+    devuelto = query_value(
+        "SELECT COUNT(*) FROM refunds WHERE doc_type = 'MEMBERSHIP' AND doc_id = ?",
+        (membership_id,), 0,
+    )
+    if devuelto:
+        flash(
+            "No se puede cancelar: esta inscripción tiene una devolución registrada, "
+            "que forma parte del histórico contable y no se borra.",
+            "error",
+        )
+        return redirect(url_for("memberships.manage", client_id=membership["client_id"]))
 
     with transaction() as db:
         # membership_services tiene ON DELETE CASCADE, pero se borra explícitamente

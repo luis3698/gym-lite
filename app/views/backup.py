@@ -195,17 +195,18 @@ def restore_existing(name: str):
 def restore_upload():
     archivo = request.files.get("archivo")
     if archivo is None or not archivo.filename:
-        flash("Seleccione el archivo de copia (.db) que quiere restaurar.", "error")
+        flash("Seleccione el archivo de copia (.zip o .db) que quiere restaurar.", "error")
         return redirect(url_for("backup.index"))
 
     if not _confirm_password():
         return redirect(url_for("backup.index"))
 
     # Se escribe en un temporal antes de mirarlo: hay que abrirlo como base de datos
-    # para saber si sirve, y eso necesita un archivo real en disco.
+    # para saber si sirve, y eso necesita un archivo real en disco. La extensión del
+    # temporal es cosmética: verify_backup detecta .zip por contenido, no por nombre.
     temporal = None
     try:
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".bak", delete=False) as tmp:
             temporal = Path(tmp.name)
             leidos = 0
             while True:

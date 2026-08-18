@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import hashlib
 import hmac
 import secrets
 from datetime import datetime, timedelta
@@ -12,7 +13,7 @@ from flask import abort, flash, g, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .config import LOCK_MINUTES, MAX_LOGIN_ATTEMPTS, SESSION_HOURS
-from .db import execute, insert, query_one
+from .db import execute, insert, query_one, query_value
 from .helpers import DATETIME_FMT, now_str, parse_datetime
 
 # --- Contraseñas -------------------------------------------------------------
@@ -43,12 +44,20 @@ def lock_remaining_minutes(locked_until: str | None) -> int:
     return max(1, int((parsed - datetime.now()).total_seconds() // 60) + 1)
 
 
-def register_failed_attempt(user_id: int, current_attempts: int) -> str | None:
+def register_failed_attempt(user_id: int) -> str | None:
     """Suma un intento fallido y bloquea al alcanzar el máximo.
+
+    El incremento se hace en el propio UPDATE (`failed_attempts = failed_attempts +
+    1`), no leyendo el valor antes en Python y escribiendo luego un número absoluto:
+    el servidor corre con `threaded=True`, así que dos intentos fallidos casi
+    simultáneos leerían el mismo valor de partida y solo uno de los incrementos
+    sobreviviría (el clásico "lost update"), dejando que alguien intente más veces
+    de las permitidas antes de que la cuenta se bloquee.
 
     Devuelve el mensaje de bloqueo si la cuenta acaba de bloquearse, o None.
     """
-    attempts = current_attempts + 1
+    execute("UPDATE users SET failed_attempts = failed_attempts + 1 WHERE id = ?", (user_id,))
+    attempts = query_value("SELECT failed_attempts FROM users WHERE id = ?", (user_id,), 0)
     if attempts >= MAX_LOGIN_ATTEMPTS:
         locked_until = (datetime.now() + timedelta(minutes=LOCK_MINUTES)).strftime(DATETIME_FMT)
         execute(
@@ -73,10 +82,20 @@ def clear_failed_attempts(user_id: int) -> None:
 # --- Sesión ------------------------------------------------------------------
 
 
-def login_user(user_id: int) -> None:
+def _password_tag(password_hash: str) -> str:
+    """Huella corta de un hash de contraseña, para detectar que cambió.
+
+    No se guarda el hash completo en la cookie de sesión (viajaría de más); basta con
+    una huella para notar que ya no es el mismo.
+    """
+    return hashlib.sha256(password_hash.encode("utf-8")).hexdigest()[:16]
+
+
+def login_user(user_id: int, password_hash: str) -> None:
     session.clear()
     session["user_id"] = user_id
     session["expires_at"] = (datetime.now() + timedelta(hours=SESSION_HOURS)).strftime(DATETIME_FMT)
+    session["pw_tag"] = _password_tag(password_hash)
     session.permanent = False
 
 
@@ -87,8 +106,11 @@ def logout_user() -> None:
 def load_logged_in_user() -> None:
     """Carga g.user en cada petición a partir de la cookie de sesión.
 
-    Se ejecuta como before_request. Si la sesión venció o el usuario ya no existe
-    (lo eliminaron mientras tenía la sesión abierta), se limpia la cookie.
+    Se ejecuta como before_request. Si la sesión venció, el usuario ya no existe (lo
+    eliminaron mientras tenía la sesión abierta), o la contraseña cambió después de
+    que se abrió esta sesión, se limpia la cookie. Lo último importa sobre todo si una
+    cookie de sesión se robó: sin esto, cambiar la contraseña no cerraba las demás
+    sesiones abiertas, que seguían siendo válidas hasta su vencimiento natural.
     """
     g.user = None
     user_id = session.get("user_id")
@@ -107,6 +129,9 @@ def load_logged_in_user() -> None:
         (user_id,),
     )
     if row is None:
+        session.clear()
+        return
+    if session.get("pw_tag") != _password_tag(row["password_hash"]):
         session.clear()
         return
     g.user = row

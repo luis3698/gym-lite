@@ -25,7 +25,10 @@
           {%- else %}{{ status.expires_at | fecha_licencia }}{% endif %}
         </span></div>
       <div><span class="k">Última validación en línea</span>
-        <span class="v">{{ status.last_online_check | fecha_licencia }}</span></div>
+        <span class="v">
+          {%- if status.tier == 'PERPETUAL' %}No aplica (licencia perpetua, no vuelve a validar en línea)
+          {%- else %}{{ status.last_online_check | fecha_licencia }}{% endif %}
+        </span></div>
       {% if status.state == 'OFFLINE_GRACE' and status.grace_remaining_days is not none %}
         <div><span class="k">Margen sin conexión</span>
           <span class="v">Quedan {{ status.grace_remaining_days }} día(s) antes de exigir reconectar</span></div>

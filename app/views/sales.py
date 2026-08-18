@@ -9,7 +9,7 @@ from __future__ import annotations
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
 
 from ..config import MAX_ITEM_QUANTITY, VALID_PAYMENT_METHODS
-from ..db import query_all, query_one, transaction
+from ..db import query_all, query_one, query_value, transaction
 from ..helpers import now_str, optional_string
 from ..security import audit, roles_required
 from ..receipts import receipt_barcode
@@ -315,6 +315,9 @@ def receipt(sale_id: int):
     )
 
 
+HISTORY_MAX_ROWS = 300
+
+
 @bp.route("/historial")
 @roles_required("ADMIN", "CAJA")
 def history():
@@ -324,7 +327,20 @@ def history():
                      FROM sale_items si JOIN products p ON p.id = si.product_id
                     WHERE si.sale_id = s.id) AS items_summary
              FROM sales s JOIN users u ON u.id = s.seller_id
-            ORDER BY s.created_at DESC, s.id DESC LIMIT 300"""
+            ORDER BY s.created_at DESC, s.id DESC LIMIT ?""",
+        (HISTORY_MAX_ROWS,),
     )
-    total = sum(s["total"] for s in sales)
-    return render_template("sales/history.html", sales=sales, total=total)
+    # El conteo y el total se calculan aparte, con una consulta de agregación sobre
+    # TODAS las ventas, no sumando las filas mostradas: si no, en cuanto hubiera más
+    # de HISTORY_MAX_ROWS ventas el total mostrado quedaría por debajo del real sin
+    # que nada lo advirtiera (el mismo error que evita app/views/income.py).
+    resumen = query_one("SELECT COUNT(*) AS n, COALESCE(SUM(total), 0) AS total FROM sales")
+    total_count = resumen["n"] if resumen else 0
+    total = resumen["total"] if resumen else 0
+    return render_template(
+        "sales/history.html",
+        sales=sales,
+        total=total,
+        total_count=total_count,
+        max_rows=HISTORY_MAX_ROWS,
+    )

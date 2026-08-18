@@ -35,7 +35,7 @@ def seed_database(app: Flask) -> list[str]:
                                       document_id, sex, age, phone, email, blood_type,
                                       created_at, updated_at)
                    VALUES (?, ?, 'ADMIN', 'Administrador', 'General', 'ADMIN-0001',
-                           'No especifica', 30, '3000000000', 'admin@gymlite.local', 'O+', ?, ?)""",
+                           NULL, 30, '3000000000', 'admin@gymlite.local', 'O+', ?, ?)""",
                 (ADMIN_USERNAME, hash_password(ADMIN_PASSWORD), now, now),
             )
             messages.append(

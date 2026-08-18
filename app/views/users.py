@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
-from ..config import PASSWORD_POLICY_TEXT, STAFF_ROLES
+from ..config import BLOOD_TYPES, PASSWORD_POLICY_TEXT, SEX_OPTIONS, STAFF_ROLES
 from ..db import execute, insert, query_all, query_one, query_value
 from ..helpers import (
     InvalidNumber,
@@ -36,15 +38,24 @@ def _read_profile(form) -> dict:
     except InvalidNumber as exc:
         raise ValueError(str(exc)) from None
 
+    # Listas cerradas: un <select> manipulado no debe meter valores que después no
+    # encajen en los filtros ni en los informes (mismo criterio que clients.py).
+    sex = optional_string(form.get("sex"))
+    if sex and sex not in SEX_OPTIONS:
+        raise ValueError("Sexo inválido.")
+    blood_type = optional_string(form.get("blood_type"))
+    if blood_type and blood_type not in BLOOD_TYPES:
+        raise ValueError("Tipo de sangre inválido.")
+
     return {
         "first_name": first_name,
         "last_name": last_name,
         "document_id": document_id,
         "email": email,
-        "sex": optional_string(form.get("sex")),
+        "sex": sex,
         "age": age,
         "phone": optional_string(form.get("phone")),
-        "blood_type": optional_string(form.get("blood_type")),
+        "blood_type": blood_type,
     }
 
 
@@ -173,17 +184,27 @@ def create():
 
             photo, _ = resolve_captured_photo(None, request.form.get("photo_data"))
             now = now_str()
-            insert(
-                """INSERT INTO users (username, password_hash, role, first_name, last_name,
-                                      document_id, sex, age, phone, email, blood_type, photo,
-                                      created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    username, hash_password(password), role, data["first_name"], data["last_name"],
-                    data["document_id"], data["sex"], data["age"], data["phone"], data["email"],
-                    data["blood_type"], photo, now, now,
-                ),
-            )
+            try:
+                insert(
+                    """INSERT INTO users (username, password_hash, role, first_name, last_name,
+                                          document_id, sex, age, phone, email, blood_type, photo,
+                                          created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        username, hash_password(password), role, data["first_name"], data["last_name"],
+                        data["document_id"], data["sex"], data["age"], data["phone"], data["email"],
+                        data["blood_type"], photo, now, now,
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                # Las comprobaciones de arriba no cierran la carrera: dos altas casi
+                # simultáneas con el mismo usuario/documento/correo pueden pasarlas
+                # las dos antes de que ninguna escriba. Sin este except, la segunda
+                # caía en un error 500 y la foto recién guardada quedaba huérfana.
+                delete_image(photo)
+                raise ValueError(
+                    "Ya existe un usuario con ese nombre de usuario, documento o correo."
+                ) from None
             audit("USER_CREATED", f"usuario creado: {username}")
             flash(f"Usuario «{username}» creado correctamente.", "success")
             return redirect(url_for("users.index"))
@@ -220,17 +241,24 @@ def edit(user_id: int):
                 target["photo"], request.form.get("photo_data")
             )
 
-            execute(
-                """UPDATE users SET role = ?, first_name = ?, last_name = ?, document_id = ?,
-                                    sex = ?, age = ?, phone = ?, email = ?, blood_type = ?,
-                                    photo = ?, updated_at = ?
-                    WHERE id = ?""",
-                (
-                    role, data["first_name"], data["last_name"], data["document_id"], data["sex"],
-                    data["age"], data["phone"], data["email"], data["blood_type"], photo,
-                    now_str(), user_id,
-                ),
-            )
+            try:
+                execute(
+                    """UPDATE users SET role = ?, first_name = ?, last_name = ?, document_id = ?,
+                                        sex = ?, age = ?, phone = ?, email = ?, blood_type = ?,
+                                        photo = ?, updated_at = ?
+                        WHERE id = ?""",
+                    (
+                        role, data["first_name"], data["last_name"], data["document_id"], data["sex"],
+                        data["age"], data["phone"], data["email"], data["blood_type"], photo,
+                        now_str(), user_id,
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                if photo != target["photo"]:
+                    delete_image(photo)
+                raise ValueError(
+                    "Ya existe un usuario con ese documento o correo."
+                ) from None
             delete_image(to_delete)
             audit("USER_UPDATED", f"usuario editado: {target['username']}")
             flash("Usuario actualizado correctamente.", "success")
