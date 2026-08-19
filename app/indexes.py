@@ -124,6 +124,18 @@ INDEX_BY_CODE = {i.code: i for i in INDEXES}
 # [min, max), así que dos filas seguidas encajan sin huecos ni solapes.
 
 DEFAULT_RANGES: dict[str, tuple[tuple, ...]] = {
+    # Clasificación por sexo (fuente: Tabla_IMC_Sexo_Edad.xlsx, ficha de referencia
+    # calculada sobre una estatura promedio de 1,75 m). La tabla trae la misma franja
+    # de edad (18-59) en TODAS las filas sin excepción, así que no aporta ninguna
+    # distinción real entre filas: codificarla habría dejado sin clasificar a
+    # cualquier cliente fuera de ese rango (o sin edad registrada) en vez de sumar
+    # precisión, así que se omite a propósito y los rangos quedan válidos para
+    # cualquier edad, igual que antes.
+    #
+    # La columna "General" de la fuente coincide con el corte estándar de la OMS (el
+    # valor por defecto que ya tenía este programa) y queda como fila sin sexo: cubre
+    # a quien no tiene sexo registrado o lo tiene como "Otro". Las filas de
+    # Masculino/Femenino son más específicas y ganan sobre esa por `_specificity()`.
     "IMC": (
         (None, None, None, None, 18.5, "Bajo peso", "warn"),
         (None, None, None, 18.5, 25.0, "Peso normal", "ok"),
@@ -131,6 +143,18 @@ DEFAULT_RANGES: dict[str, tuple[tuple, ...]] = {
         (None, None, None, 30.0, 35.0, "Obesidad grado I", "bad"),
         (None, None, None, 35.0, 40.0, "Obesidad grado II", "bad"),
         (None, None, None, 40.0, None, "Obesidad grado III", "bad"),
+        ("Masculino", None, None, None, 20.0, "Bajo peso", "warn"),
+        ("Masculino", None, None, 20.0, 25.0, "Peso normal", "ok"),
+        ("Masculino", None, None, 25.0, 30.0, "Sobrepeso", "warn"),
+        ("Masculino", None, None, 30.0, 35.0, "Obesidad grado I", "bad"),
+        ("Masculino", None, None, 35.0, 40.0, "Obesidad grado II", "bad"),
+        ("Masculino", None, None, 40.0, None, "Obesidad grado III", "bad"),
+        ("Femenino", None, None, None, 18.5, "Bajo peso", "warn"),
+        ("Femenino", None, None, 18.5, 24.0, "Peso normal", "ok"),
+        ("Femenino", None, None, 24.0, 29.0, "Sobrepeso", "warn"),
+        ("Femenino", None, None, 29.0, 34.0, "Obesidad grado I", "bad"),
+        ("Femenino", None, None, 34.0, 39.0, "Obesidad grado II", "bad"),
+        ("Femenino", None, None, 39.0, None, "Obesidad grado III", "bad"),
     ),
     "GRASA": (
         ("Masculino", None, None, None, 6.0, "Grasa esencial", "warn"),

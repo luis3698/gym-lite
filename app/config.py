@@ -285,6 +285,7 @@ ACTION_LABELS = {
     "MIGRATION_IMPORT": "Socios importados desde archivo",
     "INDEX_TOGGLED": "Índice corporal activado o desactivado",
     "INDEX_RANGE_ADDED": "Rango de índice corporal añadido",
+    "INDEX_RANGE_EDITED": "Rango de índice corporal editado",
     "INDEX_RANGE_DELETED": "Rango de índice corporal eliminado",
     "INDEX_RANGES_RESTORED": "Rangos de índice corporal restaurados",
     "LICENSE_ACTIVATED": "Licencia activada",

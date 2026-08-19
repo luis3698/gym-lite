@@ -6,3 +6,7 @@ requests>=2.31,<3.0
 # Licenciamiento (app/licensing.py): cifra la clave local con DPAPI de Windows
 # cuando está disponible; si el empaquetado falla, hay una reserva a archivo plano.
 pywin32>=306
+# Reconocimiento facial (app/faces.py): compara el rostro detectado contra la
+# galería del gimnasio con operaciones vectorizadas, mucho más rápido que un
+# bucle Python puro a medida que crece la cantidad de socios.
+numpy>=1.26,<3.0

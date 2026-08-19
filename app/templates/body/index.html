@@ -87,10 +87,48 @@
                     </span>
                   </td>
                   <td class="right">
-                    <form method="post" action="{{ url_for('body.delete_range', range_id=r['id']) }}">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button class="linkbtn danger tiny">Eliminar</button>
-                    </form>
+                    <div class="row tight" style="justify-content:flex-end;flex-wrap:nowrap">
+                      <details class="fieldset" style="display:inline-block;text-align:left">
+                        <summary class="linkbtn tiny">Editar</summary>
+                        <div style="margin-top:.5rem;width:230px">
+                          <form method="post" action="{{ url_for('body.edit_range', range_id=r['id']) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label class="field" style="margin-bottom:.5rem"><span>Desde</span>
+                              <input type="number" name="min_value" step="0.01" placeholder="sin tope"
+                                     value="{{ r['min_value'] if r['min_value'] is not none else '' }}"></label>
+                            <label class="field" style="margin-bottom:.5rem"><span>Hasta</span>
+                              <input type="number" name="max_value" step="0.01" placeholder="sin tope"
+                                     value="{{ r['max_value'] if r['max_value'] is not none else '' }}"></label>
+                            <label class="field" style="margin-bottom:.5rem"><span>Sexo</span>
+                              <select name="sex">
+                                <option value="" {{ 'selected' if not r['sex'] }}>Cualquiera</option>
+                                {% for s in SEX_OPTIONS %}
+                                  <option value="{{ s }}" {{ 'selected' if r['sex'] == s }}>{{ s }}</option>
+                                {% endfor %}
+                              </select></label>
+                            <label class="field" style="margin-bottom:.5rem"><span>Edad desde</span>
+                              <input type="number" name="age_min" min="0" max="120" placeholder="—"
+                                     value="{{ r['age_min'] if r['age_min'] is not none else '' }}"></label>
+                            <label class="field" style="margin-bottom:.5rem"><span>Edad hasta</span>
+                              <input type="number" name="age_max" min="0" max="120" placeholder="—"
+                                     value="{{ r['age_max'] if r['age_max'] is not none else '' }}"></label>
+                            <label class="field" style="margin-bottom:.5rem"><span>Etiqueta *</span>
+                              <input type="text" name="label" required value="{{ r['label'] }}"></label>
+                            <label class="field" style="margin-bottom:.6rem"><span>Nivel</span>
+                              <select name="severity">
+                                {% for key, label in severities.items() %}
+                                  <option value="{{ key }}" {{ 'selected' if r['severity'] == key }}>{{ label }}</option>
+                                {% endfor %}
+                              </select></label>
+                            <button class="btn btn-primary btn-sm" style="width:100%">Guardar</button>
+                          </form>
+                        </div>
+                      </details>
+                      <form method="post" action="{{ url_for('body.delete_range', range_id=r['id']) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="linkbtn danger tiny">Eliminar</button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               {% endfor %}

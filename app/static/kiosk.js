@@ -41,10 +41,18 @@
     // Sin esto la ficha parpadea entre «no reconocido» y el nombre correcto.
     CONFIRM_FRAMES: 2,
 
+    // Dos umbrales que antes eran uno solo (SAME_PERSON_DISTANCE), separados porque
+    // resuelven dos preguntas distintas: CONFIRM_DISTANCE decide si dos fotogramas
+    // seguidos DEL MISMO INSTANTE son la misma persona (debe ser estricto, es la base
+    // de la identificación); LINGER_DISTANCE decide si quien sigue delante de la
+    // cámara un rato después sigue siendo esa persona (algo más laxo a propósito: la
+    // pose y la luz cambian un poco mientras alguien espera o habla).
+    CONFIRM_DISTANCE: 0.45,
+    LINGER_DISTANCE: 0.50,
+
     // Mientras la misma persona siga delante, no se vuelve a preguntar al servidor.
     // Este es el antirrebote de verdad: sin él, quien se queda charlando genera una
     // petición cada 300 ms.
-    SAME_PERSON_DISTANCE: 0.45,
     LINGER_MS: 20000,
 
     // La ficha se queda en pantalla un rato después de que la persona se aparte,
@@ -53,7 +61,25 @@
 
     // Tras un fallo de red se espera más entre intentos, para no machacar un
     // servidor que ya está teniendo problemas.
-    ERROR_BACKOFF_MS: 3000
+    ERROR_BACKOFF_MS: 3000,
+
+    // -- Iluminación ----------------------------------------------------------
+    // Luminancia media (0-255) fuera de la cual se considera «luz difícil» y se
+    // corrige antes de detectar. Con luz normal no se calcula nada de esto.
+    LUMA_LOW: 60,
+    LUMA_HIGH: 190,
+
+    // -- Vida básica (anti-suplantación) ---------------------------------------
+    // Distancia media entre puntos de referencia (landmarks) de dos fotogramas de
+    // confirmación. Una foto impresa sostenida con la mano apenas se mueve entre dos
+    // fotogramas de 300 ms; una cara real siempre tiene algo de movimiento
+    // involuntario. No es detección de parpadeo ni de vídeo en una pantalla —eso
+    // exigiría observar varios segundos, y chocaría con que el kiosco sea rápido—,
+    // solo descarta el caso más barato y común de suplantación.
+    MIN_LIVENESS_MOVEMENT: 0.35,
+    // Tope de fotogramas extra esperando ese movimiento: si alguien se queda
+    // realmente inmóvil, no debe quedar bloqueado para siempre por esta comprobación.
+    LIVENESS_MAX_EXTRA_FRAMES: 6
   };
 
   var MODELS_URL = root.dataset.modelsUrl;
@@ -107,7 +133,10 @@
 
     // Confirmación temporal: qué se vio y cuántas veces seguidas.
     pending: null,
+    pendingLandmarks: null,
     pendingCount: 0,
+    bestMovement: 0,
+    livenessExtra: 0,
 
     // Última persona identificada, para no repetir la consulta mientras siga ahí.
     last: null,         // { descriptor, payload, at }
@@ -128,6 +157,76 @@
 
   function boxArea(box) {
     return Math.max(0, box.width) * Math.max(0, box.height);
+  }
+
+  function landmarkMovement(a, b) {
+    // Distancia media entre los mismos 68 puntos de referencia en dos fotogramas.
+    // null si no hay con qué comparar (primer fotograma de una confirmación nueva).
+    if (!a || !b || !a.positions || !b.positions || a.positions.length !== b.positions.length) return null;
+    var total = 0;
+    for (var i = 0; i < a.positions.length; i++) {
+      var dx = a.positions[i].x - b.positions[i].x;
+      var dy = a.positions[i].y - b.positions[i].y;
+      total += Math.sqrt(dx * dx + dy * dy);
+    }
+    return total / a.positions.length;
+  }
+
+  // --- Normalización de iluminación -----------------------------------------
+  // Con luz normal esto cuesta casi nada (un lienzo de 80x45). El estiramiento de
+  // niveles, que sí tiene un costo real, solo se paga cuando la luz de verdad es
+  // mala —que es justo cuando más ayuda—.
+
+  var lumaBuffer = document.createElement('canvas');
+  lumaBuffer.width = 80;
+  lumaBuffer.height = 45;
+  var fullBuffer = document.createElement('canvas');
+
+  function clampByte(v) {
+    return v < 0 ? 0 : (v > 255 ? 255 : v);
+  }
+
+  function averageLuma(ctx, w, h) {
+    var data = ctx.getImageData(0, 0, w, h).data;
+    var total = 0;
+    var count = data.length / 4;
+    for (var i = 0; i < data.length; i += 4) {
+      total += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+    return total / count;
+  }
+
+  function detectionSource() {
+    if (!el.video.videoWidth) return el.video;
+
+    var lumaCtx = lumaBuffer.getContext('2d');
+    lumaCtx.drawImage(el.video, 0, 0, lumaBuffer.width, lumaBuffer.height);
+    var luma = averageLuma(lumaCtx, lumaBuffer.width, lumaBuffer.height);
+    if (luma >= CFG.LUMA_LOW && luma <= CFG.LUMA_HIGH) return el.video;
+
+    var w = el.video.videoWidth, h = el.video.videoHeight;
+    if (fullBuffer.width !== w || fullBuffer.height !== h) {
+      fullBuffer.width = w;
+      fullBuffer.height = h;
+    }
+    var ctx = fullBuffer.getContext('2d');
+    ctx.drawImage(el.video, 0, 0, w, h);
+    var img = ctx.getImageData(0, 0, w, h);
+    var d = img.data;
+    var lo = 255, hi = 0;
+    for (var i = 0; i < d.length; i += 4) {
+      var v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    var range = Math.max(1, hi - lo);
+    for (var j = 0; j < d.length; j += 4) {
+      d[j] = clampByte((d[j] - lo) * 255 / range);
+      d[j + 1] = clampByte((d[j + 1] - lo) * 255 / range);
+      d[j + 2] = clampByte((d[j + 2] - lo) * 255 / range);
+    }
+    ctx.putImageData(img, 0, 0);
+    return fullBuffer;
   }
 
   function tickClock() {
@@ -318,13 +417,13 @@
 
   // --- Dibujo del recuadro -------------------------------------------------
 
-  function drawBoxes(detections, subject) {
+  function drawBoxes(results, subject) {
     var ctx = el.overlay.getContext('2d');
     ctx.clearRect(0, 0, el.overlay.width, el.overlay.height);
 
-    detections.forEach(function (det) {
-      var box = det.box || det.detection.box;
-      var isSubject = subject && box === (subject.box || (subject.detection && subject.detection.box));
+    results.forEach(function (r) {
+      var box = r.detection.box;
+      var isSubject = subject && box === subject.detection.box;
       ctx.lineWidth = isSubject ? 4 : 2;
       ctx.strokeStyle = isSubject ? '#22c55e' : 'rgba(255,255,255,.45)';
       ctx.strokeRect(box.x, box.y, box.width, box.height);
@@ -339,95 +438,117 @@
 
   // --- Bucle de detección --------------------------------------------------
 
-  function pickSubject(detections) {
-    /* Devuelve { box } de la persona a identificar, o null si es ambiguo.
-       Que haya dos caras no significa que haya dos personas entrando: lo normal es
-       que alguien cruce por detrás. Si una domina claramente en tamaño, es la que
-       está en la cámara. */
-    if (detections.length === 1) return detections[0];
+  function pickSubject(results) {
+    /* Devuelve el resultado (detección + landmarks + descriptor) de la persona a
+       identificar, o null si es ambiguo. Que haya dos caras no significa que haya
+       dos personas entrando: lo normal es que alguien cruce por detrás. Si una
+       domina claramente en tamaño, es la que está en la cámara. */
+    if (results.length === 1) return results[0];
 
-    var sorted = detections.slice().sort(function (a, b) { return boxArea(b.box) - boxArea(a.box); });
-    if (boxArea(sorted[0].box) >= boxArea(sorted[1].box) * CFG.DOMINANT_RATIO) return sorted[0];
+    var sorted = results.slice().sort(function (a, b) {
+      return boxArea(b.detection.box) - boxArea(a.detection.box);
+    });
+    if (boxArea(sorted[0].detection.box) >= boxArea(sorted[1].detection.box) * CFG.DOMINANT_RATIO) {
+      return sorted[0];
+    }
     return null;
+  }
+
+  function resetPending() {
+    state.pending = null;
+    state.pendingLandmarks = null;
+    state.pendingCount = 0;
+    state.bestMovement = 0;
+    state.livenessExtra = 0;
   }
 
   function loop() {
     if (state.busy || !state.ready || document.hidden) return;
     state.busy = true;
 
+    // Detección, puntos de referencia y descriptor en UNA sola pasada por la red
+    // (antes eran dos: detectAllFaces para contar caras y detectSingleFace para
+    // sacar el descriptor, que volvía a correr el mismo detector desde cero).
     faceapi
-      .detectAllFaces(el.video, state.options)
-      .then(function (detections) {
+      .detectAllFaces(detectionSource(), state.options)
+      .withFaceLandmarks()
+      .withFaceDescriptors()
+      .then(function (results) {
         syncOverlay();
 
         // -- Nadie delante ---------------------------------------------------
-        if (detections.length === 0) {
+        if (results.length === 0) {
           drawBoxes([], null);
           setBanner(null);
-          state.pending = null;
-          state.pendingCount = 0;
+          resetPending();
           if (Date.now() > state.shownUntil) renderIdle();
-          return null;
+          return;
         }
 
         // -- Varias personas sin una clara ------------------------------------
-        var subject = pickSubject(detections);
+        var subject = pickSubject(results);
         if (!subject) {
-          drawBoxes(detections, null);
-          setBanner('👥', 'Hay ' + detections.length + ' personas frente a la cámara. Pasen de uno en uno.');
+          drawBoxes(results, null);
+          setBanner('👥', 'Hay ' + results.length + ' personas frente a la cámara. Pasen de uno en uno.');
           renderMessage('multiple', '👥', 'Pasen de uno en uno',
             'Para registrar la entrada solo puede haber una persona frente a la cámara.');
-          state.pending = null;
-          state.pendingCount = 0;
-          return null;
+          resetPending();
+          return;
         }
 
-        drawBoxes(detections, subject);
+        drawBoxes(results, subject);
         setBanner(
-          detections.length > 1 ? '👥' : null,
-          detections.length > 1 ? 'Se está registrando a la persona más cercana a la cámara.' : null
+          results.length > 1 ? '👥' : null,
+          results.length > 1 ? 'Se está registrando a la persona más cercana a la cámara.' : null
         );
 
         // -- Demasiado lejos ---------------------------------------------------
-        if (subject.box.width < el.video.videoWidth * CFG.MIN_FACE_RATIO) {
+        if (subject.detection.box.width < el.video.videoWidth * CFG.MIN_FACE_RATIO) {
           renderMessage('far', '📏', 'Acérquese a la cámara',
             'Su rostro se ve demasiado pequeño para reconocerlo.');
-          state.pending = null;
-          state.pendingCount = 0;
-          return null;
+          resetPending();
+          return;
         }
 
-        // Solo aquí se paga el coste de calcular el descriptor.
-        return faceapi
-          .detectSingleFace(el.video, state.options)
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-      })
-      .then(function (result) {
-        if (!result || !result.descriptor) return;
-        var descriptor = result.descriptor;
+        if (!subject.descriptor) return;
+        var descriptor = subject.descriptor;
 
         // -- ¿Sigue siendo la misma persona de hace un momento? ---------------
         // Se resuelve en el navegador comparando con el último descriptor: así
         // quien se queda parado delante no genera ni una sola petición extra.
         if (state.last && Date.now() - state.last.at < CFG.LINGER_MS &&
-            distance(descriptor, state.last.descriptor) <= CFG.SAME_PERSON_DISTANCE) {
+            distance(descriptor, state.last.descriptor) <= CFG.LINGER_DISTANCE) {
           state.last.at = Date.now();
           state.shownUntil = Date.now() + CFG.CARD_HOLD_MS;
           return;
         }
 
-        // -- Confirmación en varios fotogramas --------------------------------
-        if (state.pending && distance(descriptor, state.pending) <= CFG.SAME_PERSON_DISTANCE) {
+        // -- Confirmación en varios fotogramas ---------------------------------
+        if (state.pending && distance(descriptor, state.pending) <= CFG.CONFIRM_DISTANCE) {
           state.pendingCount += 1;
+          var movimiento = landmarkMovement(subject.landmarks, state.pendingLandmarks);
+          if (movimiento !== null && movimiento > state.bestMovement) state.bestMovement = movimiento;
+          state.pendingLandmarks = subject.landmarks;
         } else {
           state.pending = descriptor;
+          state.pendingLandmarks = subject.landmarks;
           state.pendingCount = 1;
+          state.bestMovement = 0;
+          state.livenessExtra = 0;
         }
         if (state.pendingCount < CFG.CONFIRM_FRAMES) return;
 
-        state.pending = null;
-        state.pendingCount = 0;
+        // -- Vida básica: ¿hubo algo de movimiento natural entre fotogramas? ---
+        // Una foto impresa sostenida con la mano apenas se mueve; una cara real,
+        // sí. No bloquea para siempre a quien esté muy quieto: pasado el tope de
+        // fotogramas extra, se deja pasar de todas formas (ver CFG).
+        if (state.bestMovement < CFG.MIN_LIVENESS_MOVEMENT &&
+            state.livenessExtra < CFG.LIVENESS_MAX_EXTRA_FRAMES) {
+          state.livenessExtra += 1;
+          return;
+        }
+
+        resetPending();
         identify(descriptor);
       })
       .catch(function (err) {
@@ -444,10 +565,28 @@
 
   function startCamera() {
     return navigator.mediaDevices
-      .getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } })
+      .getUserMedia({
+        video: {
+          width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user',
+          // Enfoque automático continuo, si la cámara y el navegador lo exponen
+          // (extensión no estándar, sobre todo en Chromium). Es «mejor esfuerzo»:
+          // una clave desconocida dentro de `advanced` se ignora sin error según el
+          // propio algoritmo de restricciones de getUserMedia, así que no hace falta
+          // detectar soporte de antemano ni hay riesgo de que falle el arranque.
+          advanced: [{ focusMode: 'continuous' }]
+        }
+      })
       .then(function (stream) {
         state.stream = stream;
         el.video.srcObject = stream;
+
+        // Segundo intento por si el navegador solo acepta el foco continuo aplicado
+        // sobre el track ya abierto, en vez de al pedir la cámara. Mismo criterio de
+        // «mejor esfuerzo»: si no lo soporta, esto no hace nada y no interrumpe nada.
+        var videoTrack = stream.getVideoTracks()[0];
+        if (videoTrack && videoTrack.applyConstraints) {
+          videoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {});
+        }
 
         // Si alguien desconecta la webcam, el track termina y el vídeo se queda
         // congelado sin avisar. Hay que decirlo en pantalla.
@@ -492,6 +631,25 @@
     showVeil(message, hint, false);
   }
 
+  function confirmBackend() {
+    // Confirma que tfjs use WebGL (GPU) en vez de caer a un modo más lento (CPU/WASM)
+    // sin que nadie lo note. Todo detrás de comprobaciones de existencia: si la
+    // librería cambiara de forma, esto simplemente no hace nada, nunca bloquea el
+    // arranque del kiosco.
+    if (!faceapi.tf || !faceapi.tf.setBackend) return null;
+    return faceapi.tf.setBackend('webgl')
+      .catch(function () {})
+      .then(function () {
+        return faceapi.tf.ready ? faceapi.tf.ready() : null;
+      })
+      .then(function () {
+        if (faceapi.tf.getBackend && faceapi.tf.getBackend() !== 'webgl') {
+          console.warn('[kiosco] usando backend "' + faceapi.tf.getBackend() + '" (más lento que webgl)');
+        }
+      })
+      .catch(function () {});
+  }
+
   function boot() {
     tickClock();
     setInterval(tickClock, 20000);
@@ -513,6 +671,7 @@
       faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL),
       faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL)
     ])
+      .then(confirmBackend)
       .then(function () {
         state.options = new faceapi.TinyFaceDetectorOptions({
           inputSize: CFG.INPUT_SIZE,

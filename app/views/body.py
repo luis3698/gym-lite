@@ -130,6 +130,34 @@ def add_range(code: str):
     return redirect(url_for("body.index", _anchor=code))
 
 
+@bp.post("/rango/<int:range_id>/editar")
+@roles_required("ADMIN")
+def edit_range(range_id: int):
+    row = query_one("SELECT * FROM index_ranges WHERE id = ?", (range_id,))
+    if row is None:
+        flash("Rango no encontrado.", "error")
+        return redirect(url_for("body.index"))
+
+    try:
+        data = _read_range(request.form)
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("body.index", _anchor=row["index_code"]))
+
+    # `index_code` y `sort_order` no se tocan: editar no debe cambiar de índice ni
+    # reordenar la tabla, solo actualizar los datos de esta fila.
+    execute(
+        """UPDATE index_ranges SET sex = ?, age_min = ?, age_max = ?, min_value = ?,
+                                    max_value = ?, label = ?, severity = ?
+            WHERE id = ?""",
+        (data["sex"], data["age_min"], data["age_max"], data["min_value"],
+         data["max_value"], data["label"], data["severity"], range_id),
+    )
+    audit("INDEX_RANGE_EDITED", f"{row['index_code']}: {row['label']} -> {data['label']}")
+    flash(f"Rango «{data['label']}» actualizado.", "success")
+    return redirect(url_for("body.index", _anchor=row["index_code"]))
+
+
 @bp.post("/rango/<int:range_id>/eliminar")
 @roles_required("ADMIN")
 def delete_range(range_id: int):

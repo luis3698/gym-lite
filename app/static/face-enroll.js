@@ -36,7 +36,26 @@
     VARIATION_TIMEOUT_MS: 4000,
 
     // Pausa entre muestras, para que dé tiempo a leer la indicación y moverse.
-    BETWEEN_MS: 900
+    BETWEEN_MS: 900,
+
+    // -- Calidad de la muestra -------------------------------------------------
+    // Una muestra de referencia mala arrastra reconocimientos malos para siempre:
+    // es contra lo que se compara todo el futuro de ese cliente. Se mide sobre un
+    // recorte pequeño (60x60) de la cara, así que es barato y se calcula solo sobre
+    // fotogramas que ya pasaron los demás filtros.
+    // Luminancia media (0-255) mínima aceptable.
+    MIN_BRIGHTNESS: 40,
+    // Varianza de un gradiente simple; valores bajos indican imagen movida o
+    // desenfocada. Con un borde nítido de prueba (transición abrupta) esta fórmula
+    // da varianzas del orden de cientos; el mismo borde difuminado en ~20 píxeles
+    // (una foto claramente movida) cae a apenas unas decenas — por eso el punto de
+    // partida se deja bajo respecto a lo que da una imagen nítida real, para no
+    // rechazar de más antes de calibrarlo con cámaras reales.
+    MIN_SHARPNESS: 40,
+
+    // Luminancia (0-255) fuera de la cual se corrige el fotograma antes de detectar.
+    LUMA_LOW: 60,
+    LUMA_HIGH: 190
   };
 
   /* Cada muestra pide una pose distinta. La red reconoce mejor de frente, así que las
@@ -119,6 +138,24 @@
     state.stable = 0;
   }
 
+  function confirmBackend() {
+    // Confirma que tfjs use WebGL (GPU) en vez de caer a un modo más lento (CPU/WASM)
+    // sin que nadie lo note. Todo detrás de comprobaciones de existencia: si la
+    // librería cambiara de forma, esto simplemente no hace nada.
+    if (!faceapi.tf || !faceapi.tf.setBackend) return null;
+    return faceapi.tf.setBackend('webgl')
+      .catch(function () {})
+      .then(function () {
+        return faceapi.tf.ready ? faceapi.tf.ready() : null;
+      })
+      .then(function () {
+        if (faceapi.tf.getBackend && faceapi.tf.getBackend() !== 'webgl') {
+          console.warn('[rostro] usando backend "' + faceapi.tf.getBackend() + '" (más lento que webgl)');
+        }
+      })
+      .catch(function () {});
+  }
+
   function loadModels() {
     if (state.loaded) return Promise.resolve();
     hint('Cargando el motor de reconocimiento…', false);
@@ -126,7 +163,7 @@
       faceapi.nets.tinyFaceDetector.loadFromUri(root.dataset.modelsUrl),
       faceapi.nets.faceLandmark68Net.loadFromUri(root.dataset.modelsUrl),
       faceapi.nets.faceRecognitionNet.loadFromUri(root.dataset.modelsUrl)
-    ]).then(function () {
+    ]).then(confirmBackend).then(function () {
       state.options = new faceapi.TinyFaceDetectorOptions({
         inputSize: CFG.INPUT_SIZE,
         scoreThreshold: CFG.SCORE_MIN
@@ -149,12 +186,23 @@
     loadModels()
       .then(function () {
         return navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 720 }, height: { ideal: 720 }, facingMode: 'user' }
+          video: {
+            width: { ideal: 720 }, height: { ideal: 720 }, facingMode: 'user',
+            // Enfoque automático continuo, mejor esfuerzo (ver kiosk.js): una clave
+            // no reconocida dentro de `advanced` se ignora sin error.
+            advanced: [{ focusMode: 'continuous' }]
+          }
         });
       })
       .then(function (stream) {
         state.stream = stream;
         el.video.srcObject = stream;
+
+        var videoTrack = stream.getVideoTracks()[0];
+        if (videoTrack && videoTrack.applyConstraints) {
+          videoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {});
+        }
+
         return el.video.play();
       })
       .then(function () {
@@ -210,6 +258,109 @@
     }
   }
 
+  // --- Normalización de iluminación -----------------------------------------
+  // Mismo criterio que en el kiosco (kiosk.js): con luz normal casi no cuesta nada;
+  // el estiramiento de niveles solo se paga cuando la luz de verdad es mala.
+
+  var lumaBuffer = document.createElement('canvas');
+  lumaBuffer.width = 80;
+  lumaBuffer.height = 45;
+  var fullBuffer = document.createElement('canvas');
+
+  function clampByte(v) {
+    return v < 0 ? 0 : (v > 255 ? 255 : v);
+  }
+
+  function averageLuma(ctx, w, h) {
+    var data = ctx.getImageData(0, 0, w, h).data;
+    var total = 0;
+    var count = data.length / 4;
+    for (var i = 0; i < data.length; i += 4) {
+      total += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+    return total / count;
+  }
+
+  function detectionSource() {
+    if (!el.video.videoWidth) return el.video;
+
+    var lumaCtx = lumaBuffer.getContext('2d');
+    lumaCtx.drawImage(el.video, 0, 0, lumaBuffer.width, lumaBuffer.height);
+    var luma = averageLuma(lumaCtx, lumaBuffer.width, lumaBuffer.height);
+    if (luma >= CFG.LUMA_LOW && luma <= CFG.LUMA_HIGH) return el.video;
+
+    var w = el.video.videoWidth, h = el.video.videoHeight;
+    if (fullBuffer.width !== w || fullBuffer.height !== h) {
+      fullBuffer.width = w;
+      fullBuffer.height = h;
+    }
+    var ctx = fullBuffer.getContext('2d');
+    ctx.drawImage(el.video, 0, 0, w, h);
+    var img = ctx.getImageData(0, 0, w, h);
+    var d = img.data;
+    var lo = 255, hi = 0;
+    for (var i = 0; i < d.length; i += 4) {
+      var v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    var range = Math.max(1, hi - lo);
+    for (var j = 0; j < d.length; j += 4) {
+      d[j] = clampByte((d[j] - lo) * 255 / range);
+      d[j + 1] = clampByte((d[j + 1] - lo) * 255 / range);
+      d[j + 2] = clampByte((d[j + 2] - lo) * 255 / range);
+    }
+    ctx.putImageData(img, 0, 0);
+    return fullBuffer;
+  }
+
+  // --- Calidad de la muestra (brillo y nitidez) ------------------------------
+
+  var qualityBuffer = document.createElement('canvas');
+  var QUALITY_SIZE = 60;
+  qualityBuffer.width = QUALITY_SIZE;
+  qualityBuffer.height = QUALITY_SIZE;
+
+  function sampleQuality(box) {
+    var w = Math.max(1, Math.round(box.width));
+    var h = Math.max(1, Math.round(box.height));
+    var ctx = qualityBuffer.getContext('2d');
+    ctx.drawImage(el.video, box.x, box.y, w, h, 0, 0, QUALITY_SIZE, QUALITY_SIZE);
+    var data = ctx.getImageData(0, 0, QUALITY_SIZE, QUALITY_SIZE).data;
+
+    var gray = new Float32Array(QUALITY_SIZE * QUALITY_SIZE);
+    var total = 0;
+    for (var i = 0, p = 0; i < data.length; i += 4, p++) {
+      var v = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      gray[p] = v;
+      total += v;
+    }
+    var brightness = total / gray.length;
+
+    // Nitidez aproximada: varianza de un gradiente simple (diferencia entre
+    // píxeles vecinos). Una imagen movida o desenfocada tiene bordes suaves, así
+    // que el gradiente sale pequeño y poco variable.
+    var sum = 0, sumSq = 0, count = 0;
+    for (var y = 0; y < QUALITY_SIZE - 1; y++) {
+      for (var x = 0; x < QUALITY_SIZE - 1; x++) {
+        var idx = y * QUALITY_SIZE + x;
+        var gx = gray[idx + 1] - gray[idx];
+        var gy = gray[idx + QUALITY_SIZE] - gray[idx];
+        var mag = Math.abs(gx) + Math.abs(gy);
+        sum += mag;
+        sumSq += mag * mag;
+        count++;
+      }
+    }
+    var mean = sum / count;
+    var variance = (sumSq / count) - (mean * mean);
+
+    return {
+      tooDark: brightness < CFG.MIN_BRIGHTNESS,
+      blurry: variance < CFG.MIN_SHARPNESS
+    };
+  }
+
   function drawBox(box, ok) {
     var ctx = el.overlay.getContext('2d');
     if (el.overlay.width !== el.video.videoWidth) {
@@ -254,45 +405,59 @@
     if (state.busy || state.pausa || !el.video.videoWidth) return;
     state.busy = true;
 
+    // Detección, puntos de referencia y descriptor en UNA sola pasada por la red
+    // (antes eran dos: detectAllFaces para contar rostros y detectSingleFace para
+    // sacar el descriptor, que volvía a correr el mismo detector desde cero).
     faceapi
-      .detectAllFaces(el.video, state.options)
-      .then(function (faces) {
-        if (faces.length === 0) {
+      .detectAllFaces(detectionSource(), state.options)
+      .withFaceLandmarks()
+      .withFaceDescriptors()
+      .then(function (results) {
+        if (results.length === 0) {
           drawBox(null);
           rechazar('No se detecta ningún rostro. Colóquese frente a la cámara.');
           return null;
         }
-        if (faces.length > 1) {
+        if (results.length > 1) {
           drawBox(null);
-          rechazar('Se ven ' + faces.length + ' rostros. Debe quedar solo el del cliente.');
+          rechazar('Se ven ' + results.length + ' rostros. Debe quedar solo el del cliente.');
           return null;
         }
-        var box = faces[0].box;
+        var subject = results[0];
+        var box = subject.detection.box;
         if (box.width < el.video.videoWidth * CFG.MIN_FACE_RATIO) {
           drawBox(box, false);
           rechazar('Acérquese más a la cámara: el rostro se ve pequeño.');
           return null;
         }
         drawBox(box, true);
-
-        return faceapi
-          .detectSingleFace(el.video, state.options)
-          .withFaceLandmarks()
-          .withFaceDescriptor();
+        return subject;
       })
-      .then(function (result) {
-        if (!result || !result.descriptor) return;
+      .then(function (subject) {
+        if (!subject || !subject.descriptor) return;
 
         var pose = POSES[state.indice % POSES.length];
-        if (desvioLateral(result.landmarks) > pose.maxYaw) {
+        if (desvioLateral(subject.landmarks) > pose.maxYaw) {
           rechazar('Demasiado girado. ' + pose.texto);
+          return;
+        }
+
+        // Calidad de la muestra: una de referencia mala arrastra reconocimientos
+        // malos para siempre, así que se rechaza antes de aceptarla, no después.
+        var calidad = sampleQuality(subject.detection.box);
+        if (calidad.tooDark) {
+          rechazar('Hay poca luz. Acérquese a una zona más iluminada.');
+          return;
+        }
+        if (calidad.blurry) {
+          rechazar('Imagen borrosa. Quédese quieto un momento.');
           return;
         }
 
         // Que la muestra aporte algo respecto a la anterior.
         var previa = state.capturadas[state.capturadas.length - 1];
         var esperando = Date.now() - state.esperandoDesde;
-        if (previa && distancia(Array.from(result.descriptor), previa) < CFG.MIN_VARIATION &&
+        if (previa && distancia(Array.from(subject.descriptor), previa) < CFG.MIN_VARIATION &&
             esperando < CFG.VARIATION_TIMEOUT_MS) {
           rechazar(pose.texto + ' (cambie un poco la postura)');
           return;
@@ -303,7 +468,7 @@
           hint('Quieto un momento… ' + pose.texto, false);
           return;
         }
-        aceptar(result.descriptor);
+        aceptar(subject.descriptor);
       })
       .catch(function (err) {
         console.error('[rostro] fallo al analizar', err);

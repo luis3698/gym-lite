@@ -17,6 +17,8 @@ import json
 import math
 from typing import Any
 
+import numpy as np
+
 from .config import (
     FACE_DESCRIPTOR_LENGTH,
     FACE_MATCH_THRESHOLD,
@@ -70,14 +72,18 @@ def serialize_descriptor(values: list[float]) -> str:
 
 # --- Galería en memoria -------------------------------------------------------
 # Releer y volver a interpretar el JSON de cada rostro en cada fotograma es el coste
-# dominante del kiosco. Se guarda ya interpretada y se comprueba con una consulta
-# barata si cambió (alta o baja de rostros) antes de reutilizarla.
+# dominante del kiosco. Se guarda ya interpretada —y ya apilada en una matriz de
+# NumPy— y se comprueba con una consulta barata si cambió (alta o baja de rostros)
+# antes de reutilizarla.
 #
 # El servidor atiende varias peticiones a la vez; en el peor caso dos hilos
 # reconstruyen la misma galería y uno pisa al otro con un valor idéntico. Es
 # inofensivo, así que no hace falta un cerrojo.
 
-_gallery_cache: tuple[tuple[int, int], list[tuple[int, list[float]]]] | None = None
+# (ids: vector de client_id, shape (N,)) y (matrix: una fila de 128 valores por
+# muestra, shape (N, FACE_DESCRIPTOR_LENGTH)) — mismo orden en ambos.
+_Gallery = tuple["np.ndarray", "np.ndarray"]
+_gallery_cache: tuple[tuple[int, int], _Gallery] | None = None
 
 
 def invalidate_gallery() -> None:
@@ -86,7 +92,7 @@ def invalidate_gallery() -> None:
     _gallery_cache = None
 
 
-def _gallery() -> list[tuple[int, list[float]]]:
+def _gallery() -> _Gallery:
     global _gallery_cache
 
     stamp_row = query_one("SELECT COUNT(*) AS total, COALESCE(MAX(id), 0) AS last_id FROM client_faces")
@@ -96,7 +102,8 @@ def _gallery() -> list[tuple[int, list[float]]]:
     if cached is not None and cached[0] == stamp:
         return cached[1]
 
-    gallery: list[tuple[int, list[float]]] = []
+    ids: list[int] = []
+    vectors: list[list[float]] = []
     for row in query_all("SELECT client_id, descriptor FROM client_faces"):
         try:
             values = parse_descriptor(row["descriptor"])
@@ -104,45 +111,41 @@ def _gallery() -> list[tuple[int, list[float]]]:
             # Una fila corrupta no puede tumbar el kiosco entero: se ignora y el
             # resto de la galería sigue sirviendo.
             continue
-        gallery.append((row["client_id"], values))
+        ids.append(row["client_id"])
+        vectors.append(values)
 
-    _gallery_cache = (stamp, gallery)
-    return gallery
+    id_array = np.asarray(ids, dtype=np.int64)
+    # Forma explícita (N, 128) incluso con N=0: dejar que NumPy infiera la forma de
+    # una lista vacía da (0,), no (0, 128), y entonces las comparaciones de más
+    # abajo fallarían por incompatibilidad de dimensiones.
+    matrix = (
+        np.asarray(vectors, dtype=np.float64)
+        if vectors
+        else np.empty((0, FACE_DESCRIPTOR_LENGTH), dtype=np.float64)
+    )
+
+    data = (id_array, matrix)
+    _gallery_cache = (stamp, data)
+    return data
 
 
 # --- Comparación --------------------------------------------------------------
-
-
-def _squared_distance(a: list[float], b: list[float], ceiling: float) -> float | None:
-    """Distancia al cuadrado, abandonando en cuanto supera `ceiling`.
-
-    Se trabaja al cuadrado para no calcular 128 raíces por comparación, y se corta en
-    cuanto la suma parcial ya no puede ganar a la mejor candidata: con una galería
-    grande, la mayoría de rostros se descartan tras unas pocas dimensiones.
-    """
-    total = 0.0
-    for index in range(FACE_DESCRIPTOR_LENGTH):
-        diff = a[index] - b[index]
-        total += diff * diff
-        if total >= ceiling:
-            return None
-    return total
+# Comparar contra la galería entera es una resta y una suma vectorizadas sobre
+# toda la matriz de una vez (NumPy), no un bucle en Python muestra por muestra:
+# con cientos o miles de rostros registrados, es varios órdenes de magnitud más
+# rápido que compararlos uno por uno, que es como funcionaba antes.
 
 
 def best_match(descriptor: list[float]) -> tuple[int | None, float | None]:
     """Cliente más parecido de toda la galería y su distancia (None si no hay rostros)."""
-    best_id: int | None = None
-    best_squared = math.inf
-
-    for client_id, sample in _gallery():
-        squared = _squared_distance(descriptor, sample, best_squared)
-        if squared is not None:
-            best_squared = squared
-            best_id = client_id
-
-    if best_id is None:
+    ids, matrix = _gallery()
+    if matrix.shape[0] == 0:
         return None, None
-    return best_id, math.sqrt(best_squared)
+
+    diffs = matrix - np.asarray(descriptor, dtype=np.float64)
+    squared = np.sum(diffs * diffs, axis=1)
+    idx = int(np.argmin(squared))
+    return int(ids[idx]), float(math.sqrt(squared[idx]))
 
 
 def classify(distance: float | None) -> str:
@@ -177,10 +180,15 @@ def duplicate_owner(descriptor: list[float], *, exclude_client_id: int) -> int |
     deja el sistema dando entrada a la persona equivocada, y el fallo solo se
     descubre cuando alguien mira el histórico.
     """
-    for client_id, sample in _gallery():
-        if client_id == exclude_client_id:
-            continue
-        squared = _squared_distance(descriptor, sample, FACE_MATCH_THRESHOLD ** 2)
-        if squared is not None:
-            return client_id
+    ids, matrix = _gallery()
+    mask = ids != exclude_client_id
+    if not mask.any():
+        return None
+
+    other_ids = ids[mask]
+    diffs = matrix[mask] - np.asarray(descriptor, dtype=np.float64)
+    squared = np.sum(diffs * diffs, axis=1)
+    idx = int(np.argmin(squared))
+    if squared[idx] <= FACE_MATCH_THRESHOLD ** 2:
+        return int(other_ids[idx])
     return None
