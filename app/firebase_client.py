@@ -18,7 +18,7 @@ ninguna llamada aparte.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import quote
@@ -151,29 +151,40 @@ def fetch_license(license_key: str, id_token: str) -> tuple[dict[str, Any] | Non
     return data, server_time
 
 
-def claim_device(license_key: str, id_token: str, device_hash: str) -> None:
+def claim_device(
+    license_key: str, id_token: str, device_hash: str, *, expires_at: datetime | None = None
+) -> None:
     """Registra este equipo como el autorizado para la licencia (una sola vez).
 
     Las reglas de seguridad de Firestore son las que de verdad impiden reclamar un
     equipo distinto del ya guardado: esta llamada solo hace la petición, no decide
     si tiene permiso.
+
+    `expires_at`, si se pasa, se escribe en la MISMA petición: es la primera
+    activación de una licencia con vencimiento, cuya vigencia empieza a contar recién
+    ahora (ver app/licensing.py::activate_license). Escribirlo junto con el resto evita
+    una segunda escritura y la ventana en la que el documento quedaría con el equipo ya
+    reclamado pero sin vencimiento fijado si algo fallara entre medias.
     """
     _require_config()
-    body = {
-        "fields": {
-            "device_id_hash": {"stringValue": device_hash},
-            "activated_at": {"stringValue": datetime.now().astimezone().isoformat()},
-        }
+    fields: dict[str, Any] = {
+        "device_id_hash": {"stringValue": device_hash},
+        "activated_at": {"stringValue": datetime.now().astimezone().isoformat()},
     }
+    field_paths = ["device_id_hash", "activated_at"]
+    if expires_at is not None:
+        fields["expires_at"] = {"timestampValue": _to_rfc3339(expires_at)}
+        field_paths.append("expires_at")
+
     try:
         response = requests.patch(
             _document_url(license_key),
             params={
-                "updateMask.fieldPaths": ["device_id_hash", "activated_at"],
+                "updateMask.fieldPaths": field_paths,
                 "key": FIREBASE_WEB_API_KEY,
             },
             headers={"Authorization": f"Bearer {id_token}"},
-            json=body,
+            json={"fields": fields},
             timeout=FIREBASE_TIMEOUT_SECONDS,
         )
     except requests.RequestException as exc:
@@ -183,3 +194,8 @@ def claim_device(license_key: str, id_token: str, device_hash: str) -> None:
         raise FirebaseError(
             f"Firebase no permitió confirmar este equipo para la licencia (HTTP {response.status_code})."
         )
+
+
+def _to_rfc3339(value: datetime) -> str:
+    """Formato que Firestore REST exige para un `timestampValue` (UTC, sufijo Z)."""
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"

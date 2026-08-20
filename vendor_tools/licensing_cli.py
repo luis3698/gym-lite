@@ -102,7 +102,16 @@ def _get_license(db, key: str) -> dict | None:
 
 
 def do_crear(customer: str, tier: str, days: int | None, notes: str) -> dict:
-    """Crea una licencia nueva. Devuelve el documento recién creado."""
+    """Crea una licencia nueva. Devuelve el documento recién creado.
+
+    `expires_at` NO se fija aquí: la vigencia empieza a contar desde que el cliente
+    activa la licencia dentro del programa (`app/licensing.py::activate_license`),
+    no desde que se genera la clave. Lo que se guarda es `duration_days` —cuántos
+    días de vigencia le corresponden—, y el primer `activate_license()` exitoso
+    calcula y fija `expires_at = ahora + duration_days`. Antes de este cambio, una
+    clave que tardara una semana en llegarle al cliente ya había perdido una semana
+    de una prueba de 15 días.
+    """
     if not customer.strip():
         raise LicenseAdminError("Escriba el nombre del cliente.")
     if tier not in TIERS:
@@ -113,10 +122,10 @@ def do_crear(customer: str, tier: str, days: int | None, notes: str) -> dict:
     issued_at = _now()
 
     if tier == "PERPETUAL":
-        expires_at = None
+        duration_days = None
     else:
         default_days = {"TRIAL": DEFAULT_TRIAL_DAYS, "MONTHLY": DEFAULT_MONTHLY_DAYS, "ANNUAL": DEFAULT_ANNUAL_DAYS}[tier]
-        expires_at = issued_at + timedelta(days=days if days is not None else default_days)
+        duration_days = days if days is not None else default_days
 
     documento = {
         "license_key": key,
@@ -124,14 +133,33 @@ def do_crear(customer: str, tier: str, days: int | None, notes: str) -> dict:
         "tier": tier,
         "status": "ACTIVE",
         "issued_at": issued_at,
-        "expires_at": expires_at,
+        "duration_days": duration_days,
+        "expires_at": None,
         "device_id_hash": None,
         "activated_at": None,
         "notes": notes.strip(),
-        "schema_version": 1,
+        "schema_version": 2,
     }
     db.collection("licenses").document(key).set(documento)
     return documento
+
+
+def vigencia_text(doc: dict) -> str:
+    """Texto legible del vencimiento, para la CLI y la GUI.
+
+    Distingue tres casos: ya activada (fecha real), perpetua (no vence nunca), y
+    creada pero pendiente de que el cliente la active (sin fecha todavía a
+    propósito — ver `do_crear`).
+    """
+    vence = doc.get("expires_at")
+    if vence:
+        return vence.strftime("%Y-%m-%d") if hasattr(vence, "strftime") else str(vence)
+    if doc.get("tier") == "PERPETUAL":
+        return "No vence"
+    dias = doc.get("duration_days")
+    if dias:
+        return f"Sin activar ({dias} día(s) desde que se active)"
+    return "No vence"
 
 
 def do_renovar(key: str, months: int, years: int, tier: str | None = None) -> dict:
@@ -178,14 +206,32 @@ def do_renovar(key: str, months: int, years: int, tier: str | None = None) -> di
     if months <= 0 and years <= 0:
         raise LicenseAdminError("Indique al menos un mes o un año a extender.")
 
-    actual = licencia.get("expires_at")
-    base = max(_now(), actual) if actual else _now()
     # Aproximación deliberada: un mes son 30 días y un año 365, no se calcula por
     # calendario. Es la misma simplificación que ya usa la tarifa de meses extra en
     # la aplicación (ver app/config.py), y aquí importa menos todavía: un día de
     # más o de menos en una renovación no afecta a nadie.
-    nuevo_vencimiento = base + timedelta(days=months * 30 + years * 365)
-    actualizacion: dict = {"expires_at": nuevo_vencimiento}
+    dias_extra = months * 30 + years * 365
+    actual = licencia.get("expires_at")
+
+    # Todavía no se activó en ningún equipo (expires_at sigue sin fijar, tal como la
+    # deja do_crear): la vigencia ni siquiera empezó a contar. Fijar ya un
+    # vencimiento rompería justo lo que se buscaba al mover el cálculo a la
+    # activación, así que en este caso se suman los días a la duración pendiente en
+    # vez de a una fecha.
+    pendiente_activacion = (
+        actual is None and licencia.get("duration_days") is not None and licencia["tier"] != "PERPETUAL"
+    )
+    if pendiente_activacion:
+        nueva_duracion = int(licencia["duration_days"]) + dias_extra
+        actualizacion: dict = {"duration_days": nueva_duracion}
+        if tier is not None:
+            actualizacion["tier"] = tier
+        db.collection("licenses").document(key).update(actualizacion)
+        return {"tier": nuevo_tier, "expires_at": None, "duration_days": nueva_duracion}
+
+    base = max(_now(), actual) if actual else _now()
+    nuevo_vencimiento = base + timedelta(days=dias_extra)
+    actualizacion = {"expires_at": nuevo_vencimiento}
     if tier is not None:
         actualizacion["tier"] = tier
     db.collection("licenses").document(key).update(actualizacion)
@@ -276,11 +322,10 @@ def create(customer: str, tier: str, days: int | None, notes: str) -> None:
     except LicenseAdminError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    expires_at = documento["expires_at"]
     click.echo(f"Licencia creada para «{customer}»:")
     click.echo(f"  Clave:   {documento['license_key']}")
     click.echo(f"  Tipo:    {tier}")
-    click.echo(f"  Vence:   {expires_at.strftime('%Y-%m-%d') if expires_at else 'No vence'}")
+    click.echo(f"  Vence:   {vigencia_text(documento)}")
     click.echo("\nEntregue esta clave al cliente para que la active dentro del programa.")
 
 
@@ -299,9 +344,7 @@ def renew(key: str, months: int, years: int, tier: str | None) -> None:
     except LicenseAdminError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    vence = resultado["expires_at"]
-    vence_txt = vence.strftime("%Y-%m-%d") if vence else "No vence"
-    click.echo(f"Licencia {key} renovada. Tipo: {resultado['tier']}. Nuevo vencimiento: {vence_txt}.")
+    click.echo(f"Licencia {key} renovada. Tipo: {resultado['tier']}. Nuevo vencimiento: {vigencia_text(resultado)}.")
 
 
 @cli.command()
@@ -376,12 +419,10 @@ def list_licenses(status: str | None, tier: str | None) -> None:
         return
 
     for d in filas:
-        vence = d.get("expires_at")
-        vence_txt = vence.strftime("%Y-%m-%d") if vence else "No vence"
         equipo = "sí" if d.get("device_id_hash") else "no"
         click.echo(
             f"  {d['license_key']}  {d['tier']:<10}  {d['status']:<8}  "
-            f"vence: {vence_txt:<12}  equipo activado: {equipo:<3}  {d.get('customer_name', '')}"
+            f"vence: {vigencia_text(d):<32}  equipo activado: {equipo:<3}  {d.get('customer_name', '')}"
         )
 
 

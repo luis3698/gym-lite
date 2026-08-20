@@ -45,6 +45,21 @@
   caché (`status_at_sync == "REVOKED"`) se sigue respetando —leer el archivo
   local no es "conectarse a Firebase"—. `activate_license()` no cambia: la
   primera activación sigue necesitando un contacto con Firebase.
+- **(2026-08-19, añadida después)** La vigencia de una licencia con
+  vencimiento empieza a contar desde que el cliente la **activa**, no desde
+  que el vendedor la **genera**. `do_crear()` ya no calcula `expires_at`: solo
+  guarda `duration_days` (cuántos días le corresponden). `expires_at` queda
+  en `None` hasta la primera activación real, momento en el que
+  `app/licensing.py::activate_license()` lo calcula
+  (`server_time + duration_days`) y lo escribe en la misma petición que
+  reclama el equipo (`claim_device`, ahora con un parámetro `expires_at`
+  opcional). Una reactivación tras `unbind` (cambio de equipo) NO recalcula
+  nada: `expires_at` ya quedó fijado la primera vez y `unbind` nunca lo
+  toca, solo `device_id_hash`/`activated_at`. Licencias creadas ANTES de
+  este cambio (con `expires_at` ya fijado desde su creación, sin
+  `duration_days`) siguen funcionando exactamente igual: la condición que
+  dispara el cálculo nuevo es específicamente `expires_at is None`, que una
+  licencia vieja nunca tiene.
 
 ## Estado actual
 
@@ -261,3 +276,29 @@ urgentes:
   sin --tier, conversión desde PERPETUAL, tier inválido, clave inexistente) y
   con la CLI real (`click.testing.CliRunner`) y la ventana de Tkinter
   instanciada de verdad (incluida la interacción con el combo del diálogo).
+- 2026-08-19: pedido del usuario: la licencia debe empezar a regir desde que
+  se **activa**, no desde que se **genera** (antes, una clave que tardara
+  en llegarle al cliente ya perdía días de una prueba/mensualidad corta).
+  Cambiado `do_crear()` (`vendor_tools/licensing_cli.py`) para guardar
+  `duration_days` en vez de un `expires_at` fijo; `activate_license()`
+  (`app/licensing.py`) calcula y fija `expires_at` en la primera activación
+  real; `claim_device()` (`app/firebase_client.py`) gana un parámetro
+  `expires_at` opcional para escribirlo en la misma petición que reclama el
+  equipo (nunca una segunda escritura aparte, para no dejar una ventana con
+  el equipo ya reclamado pero sin vencimiento). `do_renovar()`: renovar una
+  licencia YA activada sigue extendiendo una fecha real, sin cambios;
+  renovar una que TODAVÍA no se activó ahora suma los días a
+  `duration_days` en vez de fijar una fecha antes de tiempo (rompería el
+  cambio si no). Nueva función compartida `vigencia_text()` en
+  `licensing_cli.py`, usada por la CLI y por `licensing_gui.py`, para
+  mostrar correctamente los tres casos ("vence el...", "No vence"
+  perpetua, "Sin activar (N día(s) desde que se active)"). Verificado con
+  Firestore simulado en memoria: creación sin `expires_at`, primera
+  activación calculándolo correctamente (diferencia de 0.00s contra lo
+  esperado), reactivación tras `unbind` sin recalcularlo, renovación antes y
+  después de activar, PERPETUAL sin tocar, y **compatibilidad hacia atrás
+  con licencias creadas antes de este cambio** (con `expires_at` ya fijado
+  y sin `duration_days`) — se activan exactamente igual que siempre, sin
+  recalcular nada. También se re-verificaron las pruebas de humo anteriores
+  de esta sesión (PERPETUAL, renovar+cambiar tipo) para confirmar que
+  siguen pasando sin regresión.

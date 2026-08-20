@@ -571,18 +571,32 @@ def activate_license(license_key: str) -> LicenseStatus:
         )
 
     expires_raw = data.get("expires_at")
+    computed_expires_at: datetime | None = None
     if expires_raw:
         expires_at = _parse_iso(expires_raw)
         if expires_at and server_time.astimezone(timezone.utc) > expires_at:
             raise LicenseError("Esta licencia ya venció. Contacte al proveedor para renovarla.")
+    else:
+        # Sin `expires_at` todavía: es la primera activación de una licencia con
+        # vencimiento (`duration_days` viene fijado desde que se creó). La vigencia
+        # empieza a contar AHORA, no desde que el vendedor generó la clave — así el
+        # tiempo que pasó en tránsito hacia el cliente, o esperando a que la activara,
+        # no se descuenta de nada. Una reactivación tras liberar el equipo (unbind) no
+        # entra por aquí: `expires_at` ya quedó fijado la primera vez y nunca se borra,
+        # solo `device_id_hash`/`activated_at`.
+        duration_days = data.get("duration_days")
+        if duration_days:
+            computed_expires_at = server_time.astimezone(timezone.utc) + timedelta(days=duration_days)
 
     try:
-        firebase_client.claim_device(license_key, id_token, my_device)
+        firebase_client.claim_device(license_key, id_token, my_device, expires_at=computed_expires_at)
     except firebase_client.FirebaseError as exc:
         raise LicenseError(
             "La licencia es válida, pero no se pudo confirmar el equipo en Firebase. Intente de nuevo."
         ) from exc
 
+    if computed_expires_at is not None:
+        data["expires_at"] = _iso(computed_expires_at)
     data.setdefault("activated_at", _iso(server_time))
     save_cache(data, server_time=server_time)
     _last_sync_attempt = _now_utc()

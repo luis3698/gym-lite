@@ -196,7 +196,10 @@ class App(tk.Tk):
             "cliente": "Cliente", "tipo": "Tipo", "estado": "Estado",
             "vence": "Vence", "equipo": "Equipo", "clave": "Clave",
         }
-        widths = {"cliente": 170, "tipo": 80, "estado": 80, "vence": 90, "equipo": 70, "clave": 190}
+        # "vence" es más ancha que las demás a propósito: una licencia pendiente de
+        # activar muestra "Sin activar (N día(s) desde que se active)", más largo
+        # que una simple fecha.
+        widths = {"cliente": 150, "tipo": 75, "estado": 75, "vence": 210, "equipo": 60, "clave": 170}
 
         wrap = tk.Frame(right, bg=SLATE_200, bd=1, relief="solid")
         wrap.pack(fill="both", expand=True)
@@ -370,7 +373,7 @@ class App(tk.Tk):
             bg=WHITE, fg=GREEN, font=self.font_bold,
         ).pack(anchor="w")
         tk.Label(
-            pad, text=f"Tipo: {lic.TIER_LABELS[documento['tier']]}   ·   Vence: {fecha(documento['expires_at'])}",
+            pad, text=f"Tipo: {lic.TIER_LABELS[documento['tier']]}   ·   Vence: {lic.vigencia_text(documento)}",
             bg=WHITE, fg=SLATE_600, font=self.font_small,
         ).pack(anchor="w", pady=(2, 14))
 
@@ -424,7 +427,7 @@ class App(tk.Tk):
                     d.get("customer_name", ""),
                     lic.TIER_LABELS.get(d.get("tier"), d.get("tier")),
                     "Activa" if d.get("status") == "ACTIVE" else "Revocada",
-                    fecha(d.get("expires_at")),
+                    lic.vigencia_text(d),
                     "sí" if d.get("device_id_hash") else "no",
                     d["license_key"],
                 ),
@@ -485,7 +488,7 @@ class App(tk.Tk):
             ("Tipo", lic.TIER_LABELS.get(d.get("tier"), d.get("tier"))),
             ("Estado", "Activa" if d.get("status") == "ACTIVE" else "Revocada"),
             ("Emitida", fecha(d.get("issued_at"))),
-            ("Vence", fecha(d.get("expires_at"))),
+            ("Vence", lic.vigencia_text(d)),
             ("Activada", fecha(d.get("activated_at"))),
             ("Equipo (huella)", (d.get("device_id_hash") or "—")[:16] + ("…" if d.get("device_id_hash") else "")),
             ("Notas", d.get("notes") or "—"),
@@ -512,7 +515,7 @@ class App(tk.Tk):
         tk.Label(
             pad,
             text=f"Tipo actual: {lic.TIER_LABELS.get(d.get('tier'), d.get('tier'))}   ·   "
-                 f"Vence actualmente: {fecha(d.get('expires_at'))}",
+                 f"Vence actualmente: {lic.vigencia_text(d)}",
             bg=WHITE, fg=SLATE_600, font=self.font_small,
         ).pack(anchor="w", pady=(2, 12))
 
@@ -590,7 +593,7 @@ class App(tk.Tk):
                     return
                 self.footer_label.configure(
                     text=f"{d['license_key']} renovada: {lic.TIER_LABELS.get(resultado['tier'], resultado['tier'])}, "
-                         f"vence {fecha(resultado['expires_at'])}."
+                         f"vence {lic.vigencia_text(resultado)}."
                 )
                 self._refresh()
 
